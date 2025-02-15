@@ -133,7 +133,7 @@ class SegUPerNet(Decoder):
         )
 
         self.conv_seg = nn.Conv2d(self.channels, self.num_classes, kernel_size=1)
-        self.dropout = nn.Dropout2d(0.1)
+        self.dropout = nn.Dropout2d(0.0)
 
     def psp_forward(self, inputs):
         """Forward function of PSP module."""
@@ -210,6 +210,9 @@ class SegUPerNet(Decoder):
             torch.Tensor: output tensor of shape (B, num_classes, H', W') with (H' W') coressponding to the output_shape.
         """
 
+        if type(img) is dict: pass
+        else: img = {'optical': img.requires_grad_(True)}
+
         # img[modality] of shape [B C T=1 H W]
         if self.encoder.multi_temporal:
             if not self.finetune:
@@ -227,8 +230,8 @@ class SegUPerNet(Decoder):
             # remove the temporal dim
             # [B C T=1 H W] -> [B C H W]
             if not self.finetune:
-                with torch.no_grad():
-                    feat = self.encoder({k: v[:, :, 0, :, :] for k, v in img.items()})
+                #with torch.no_grad():
+                feat = self.encoder({k: v[:, :, 0, :, :] for k, v in img.items()})
             else:
                 feat = self.encoder({k: v[:, :, 0, :, :] for k, v in img.items()})
 
@@ -243,6 +246,53 @@ class SegUPerNet(Decoder):
 
         # interpolate to the target spatial dims
         output = F.interpolate(output, size=output_shape, mode="bilinear")
+
+        return output
+
+
+    def forward_pretraining(
+        self, img: dict[str, torch.Tensor], output_shape: torch.Size | None = None
+    ) -> torch.Tensor:
+        """Compute the pretraining output.
+
+        Args:
+            img (dict[str, torch.Tensor]): input data structured as a dictionary:
+            img = {modality1: tensor1, modality2: tensor2, ...}, e.g. img = {"optical": tensor1, "sar": tensor2}.
+            with tensor1 and tensor2 of shape (B C T=1 H W) with C the number of encoders'bands for the given modality.
+            output_shape (torch.Size | None, optional): output's spatial dims (H, W) (equals to the target spatial dims).
+            Defaults to None.
+
+        Returns:
+            torch.Tensor: output tensor of shape (B, num_classes, H', W') with (H' W') coressponding to the output_shape.
+        """
+
+        if type(img) is dict: pass
+        else: img = {'optical': img}
+
+        # img[modality] of shape [B C T=1 H W]
+        if self.encoder.multi_temporal:
+            if not self.finetune:
+                with torch.no_grad():
+                    feat = self.encoder(img)
+            else:
+                feat = self.encoder(img)
+
+            # multi_temporal models can return either (B C' T=1 H' W')
+            # or (B C' H' W'), we need (B C' H' W')
+            if self.encoder.multi_temporal_output:
+                feat = [f.squeeze(-3) for f in feat]
+
+        else:
+            # remove the temporal dim
+            # [B C T=1 H W] -> [B C H W]
+            if not self.finetune:
+                #with torch.no_grad():
+                feat = self.encoder({k: v[:, :, 0, :, :] for k, v in img.items()})
+            else:
+                feat = self.encoder({k: v[:, :, 0, :, :] for k, v in img.items()})
+
+        feat = self.neck(feat)
+        output = self._forward_feature(feat)
 
         return output
 

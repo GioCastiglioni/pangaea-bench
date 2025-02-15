@@ -1,0 +1,203 @@
+Available GPUs: 1
+GPU 0: NVIDIA TITAN X (Pascal)
+wandb: Currently logged in as: g-castiglioni (g-castiglioni-cornejo) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: Tracking run with wandb version 0.19.6
+wandb: Run data is saved locally in /mnt-homes/kraken/gcastiglioni/pangaea-bench/wandb/run-20250208_203914-wkaltj7k
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Resuming run 20250207_173536_9dcd22_croma_optical_seg_upernet_sen1floods11
+wandb: ⭐️ View project at https://wandb.ai/g-castiglioni-cornejo/geofm-bench
+wandb: 🚀 View run at https://wandb.ai/g-castiglioni-cornejo/geofm-bench/runs/wkaltj7k
+INFO - 02/08/25 20:39:39 - 0:00:00 - ============ Initialized logger ============
+INFO - 02/08/25 20:39:39 - 0:00:00 - 'batch_size': 4,
+                                      'ckpt_dir': None,
+                                      'criterion': {'_target_': 'torch.nn.CrossEntropyLoss',
+                                                    'ignore_index': '${dataset.ignore_index}'},
+                                      'data_replicate': 1,
+                                      'dataset': {'_target_': 'pangaea.datasets.sen1floods11.Sen1Floods11',
+                                                  'auto_download': True,
+                                                  'bands': {'optical': ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7',
+                                                                        'B8', 'B8A', 'B9', 'B10', 'B11', 'B12'],
+                                                            'sar': ['VV', 'VH']},
+                                                  'classes': ['Not Water', 'Water'],
+                                                  'data_max': {'optical': [9994, 11630, 15100, 17418, 10925, 11569,
+                                                                           12383, 15516, 13253, 3947, 1426, 14093,
+                                                                           13472],
+                                                               'sar': [29.926394, 17.376385]},
+                                                  'data_mean': {'optical': [1626.91600224, 1396.03470631,
+                                                                            1364.06118417, 1218.22847919,
+                                                                            1466.07290663, 2386.90297537,
+                                                                            2845.61256277, 2622.95796892,
+                                                                            3077.48221481, 486.87436782, 63.77861008,
+                                                                            2030.64763024, 1179.16607221],
+                                                                'sar': [-10.184408, -16.895273]},
+                                                  'data_min': {'optical': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                                               'sar': [-65.45004, -79.161446]},
+                                                  'data_std': {'optical': [700.17133846, 739.09452682, 735.2482388,
+                                                                           864.936695, 776.8803358, 921.36834309,
+                                                                           1084.37346097, 1022.63418007,
+                                                                           1196.44255318, 336.61105431, 143.99923282,
+                                                                           980.87061347, 764.60836557],
+                                                               'sar': [4.255339, 5.290568]},
+                                                  'dataset_name': 'Sen1Floods11',
+                                                  'distribution': [0.905, 0.095],
+                                                  'download_url': None,
+                                                  'gcs_bucket': 'sen1floods11',
+                                                  'ignore_index': -1,
+                                                  'img_size': 512,
+                                                  'multi_modal': True,
+                                                  'multi_temporal': False,
+                                                  'num_classes': 2,
+                                                  'root_path': '/home/gcastiglioni/datasets/pangaea-bench/sen1floods11_v1.1'},
+                                      'decoder': {'_target_': 'pangaea.decoders.upernet.SegUPerNet',
+                                                  'channels': 512,
+                                                  'encoder': None,
+                                                  'finetune': '${finetune}',
+                                                  'num_classes': '${dataset.num_classes}'},
+                                      'encoder': {'_target_': 'pangaea.encoders.croma_encoder.CROMA_OPTICAL_Encoder',
+                                                  'download_url': 'https://huggingface.co/antofuller/CROMA/resolve/main/CROMA_large.pt',
+                                                  'encoder_weights': '/home/gcastiglioni/storage/pretrained_models/CROMA_large.pt',
+                                                  'input_bands': {'optical': ['B1', 'B2', 'B3', 'B4', 'B5', 'B6',
+                                                                              'B7', 'B8', 'B8A', 'B9', 'B11',
+                                                                              'B12']},
+                                                  'input_size': 120,
+                                                  'output_dim': 1024,
+                                                  'output_layers': [3, 5, 7, 11],
+                                                  'size': 'large'},
+                                      'finetune': True,
+                                      'limited_label_strategy': 'stratified',
+                                      'limited_label_train': 0.1,
+                                      'limited_label_val': 1,
+                                      'lr_scheduler': {'_target_': 'pangaea.utils.schedulers.MultiStepLR',
+                                                       'lr_milestones': [0.6, 0.9],
+                                                       'optimizer': None,
+                                                       'total_iters': None},
+                                      'num_workers': 4,
+                                      'optimizer': {'_target_': 'torch.optim.AdamW',
+                                                    'betas': [0.9, 0.999],
+                                                    'lr': 0.001,
+                                                    'params': None,
+                                                    'weight_decay': 0.05},
+                                      'preprocessing': {'test': {'_target_': 'pangaea.engine.data_preprocessor.Preprocessor',
+                                                                 'preprocessor_cfg': [{'_target_': 'pangaea.engine.data_preprocessor.BandFilter'},
+                                                                                      {'_target_': 'pangaea.engine.data_preprocessor.NormalizeMeanStd'},
+                                                                                      {'_target_': 'pangaea.engine.data_preprocessor.BandPadding'}]},
+                                                        'train': {'_target_': 'pangaea.engine.data_preprocessor.Preprocessor',
+                                                                  'preprocessor_cfg': [{'_target_': 'pangaea.engine.data_preprocessor.RandomCropToEncoder'},
+                                                                                       {'_target_': 'pangaea.engine.data_preprocessor.BandFilter'},
+                                                                                       {'_target_': 'pangaea.engine.data_preprocessor.NormalizeMeanStd'},
+                                                                                       {'_target_': 'pangaea.engine.data_preprocessor.BandPadding'}]},
+                                                        'val': {'_target_': 'pangaea.engine.data_preprocessor.Preprocessor',
+                                                                'preprocessor_cfg': [{'_target_': 'pangaea.engine.data_preprocessor.BandFilter'},
+                                                                                     {'_target_': 'pangaea.engine.data_preprocessor.NormalizeMeanStd'},
+                                                                                     {'_target_': 'pangaea.engine.data_preprocessor.BandPadding'}]}},
+                                      'seed': 234,
+                                      'stratification_bins': 3,
+                                      'task': {'evaluator': {'_target_': 'pangaea.engine.evaluator.SegEvaluator',
+                                                             'device': None,
+                                                             'exp_dir': None,
+                                                             'inference_mode': 'sliding',
+                                                             'sliding_inference_batch': 8,
+                                                             'use_wandb': '${use_wandb}',
+                                                             'val_loader': None},
+                                               'trainer': {'_target_': 'pangaea.engine.trainer.SegTrainer',
+                                                           'best_metric_key': 'mIoU',
+                                                           'ckpt_interval': 20,
+                                                           'criterion': None,
+                                                           'device': None,
+                                                           'eval_interval': 1,
+                                                           'evaluator': None,
+                                                           'exp_dir': None,
+                                                           'log_interval': 10,
+                                                           'lr_scheduler': None,
+                                                           'model': None,
+                                                           'n_epochs': 80,
+                                                           'optimizer': None,
+                                                           'precision': 'fp32',
+                                                           'train_loader': None,
+                                                           'use_wandb': '${use_wandb}'}},
+                                      'test_batch_size': 1,
+                                      'test_num_workers': 4,
+                                      'train': True,
+                                      'use_final_ckpt': False,
+                                      'use_wandb': True,
+                                      'wandb_run_id': 'wkaltj7k',
+                                      'work_dir': '/home/gcastiglioni/pangaea-bench'
+INFO - 02/08/25 20:39:39 - 0:00:00 - The experiment is stored in /home/gcastiglioni/pangaea-bench/20250207_173536_9dcd22_croma_optical_seg_upernet_sen1floods11
+                                     
+INFO - 02/08/25 20:39:39 - 0:00:00 - Device used: cuda:0
+INFO - 02/08/25 20:43:22 - 0:03:43 - Built croma_optical.
+INFO - 02/08/25 20:43:36 - 0:03:57 - Built UPerNet for with CROMA_OPTICAL_Encoder encoder.
+INFO - 02/08/25 20:47:11 - 0:07:32 - Loaded checkpoint__best for evaluation
+Evaluating checkpoint__best on test set:   0%|          | 0/90 [00:00<?, ?it/s]Evaluating checkpoint__best on test set:   1%|          | 1/90 [00:33<50:19, 33.93s/it]Evaluating checkpoint__best on test set:   2%|▏         | 2/90 [00:35<21:37, 14.75s/it]Evaluating checkpoint__best on test set:   3%|▎         | 3/90 [00:36<12:29,  8.62s/it]Evaluating checkpoint__best on test set:   4%|▍         | 4/90 [00:37<08:13,  5.73s/it]Evaluating checkpoint__best on test set:   6%|▌         | 5/90 [00:39<05:52,  4.14s/it]Evaluating checkpoint__best on test set:   7%|▋         | 6/90 [00:40<04:27,  3.18s/it]Evaluating checkpoint__best on test set:   8%|▊         | 7/90 [00:41<03:33,  2.58s/it]Evaluating checkpoint__best on test set:   9%|▉         | 8/90 [00:43<02:58,  2.18s/it]Evaluating checkpoint__best on test set:  10%|█         | 9/90 [00:44<02:34,  1.91s/it]Evaluating checkpoint__best on test set:  11%|█         | 10/90 [00:45<02:18,  1.73s/it]Evaluating checkpoint__best on test set:  12%|█▏        | 11/90 [00:47<02:07,  1.61s/it]Evaluating checkpoint__best on test set:  13%|█▎        | 12/90 [00:48<01:58,  1.52s/it]Evaluating checkpoint__best on test set:  14%|█▍        | 13/90 [00:49<01:52,  1.46s/it]Evaluating checkpoint__best on test set:  16%|█▌        | 14/90 [00:51<01:48,  1.42s/it]Evaluating checkpoint__best on test set:  17%|█▋        | 15/90 [00:52<01:44,  1.40s/it]Evaluating checkpoint__best on test set:  18%|█▊        | 16/90 [00:53<01:42,  1.38s/it]Evaluating checkpoint__best on test set:  19%|█▉        | 17/90 [00:55<01:39,  1.37s/it]Evaluating checkpoint__best on test set:  20%|██        | 18/90 [00:56<01:37,  1.36s/it]Evaluating checkpoint__best on test set:  21%|██        | 19/90 [00:57<01:36,  1.35s/it]Evaluating checkpoint__best on test set:  22%|██▏       | 20/90 [00:59<01:34,  1.35s/it]Evaluating checkpoint__best on test set:  23%|██▎       | 21/90 [01:00<01:32,  1.35s/it]Evaluating checkpoint__best on test set:  24%|██▍       | 22/90 [01:01<01:31,  1.35s/it]Evaluating checkpoint__best on test set:  26%|██▌       | 23/90 [01:03<01:30,  1.35s/it]Evaluating checkpoint__best on test set:  27%|██▋       | 24/90 [01:04<01:28,  1.35s/it]Evaluating checkpoint__best on test set:  28%|██▊       | 25/90 [01:05<01:27,  1.34s/it]Evaluating checkpoint__best on test set:  29%|██▉       | 26/90 [01:07<01:26,  1.35s/it]Evaluating checkpoint__best on test set:  30%|███       | 27/90 [01:08<01:24,  1.34s/it]Evaluating checkpoint__best on test set:  31%|███       | 28/90 [01:09<01:23,  1.35s/it]Evaluating checkpoint__best on test set:  32%|███▏      | 29/90 [01:11<01:22,  1.35s/it]Evaluating checkpoint__best on test set:  33%|███▎      | 30/90 [01:12<01:20,  1.35s/it]Evaluating checkpoint__best on test set:  34%|███▍      | 31/90 [01:13<01:19,  1.35s/it]Evaluating checkpoint__best on test set:  36%|███▌      | 32/90 [01:15<01:18,  1.35s/it]Evaluating checkpoint__best on test set:  37%|███▋      | 33/90 [01:16<01:16,  1.35s/it]Evaluating checkpoint__best on test set:  38%|███▊      | 34/90 [01:18<01:15,  1.35s/it]Evaluating checkpoint__best on test set:  39%|███▉      | 35/90 [01:19<01:14,  1.35s/it]Evaluating checkpoint__best on test set:  40%|████      | 36/90 [01:20<01:12,  1.35s/it]Evaluating checkpoint__best on test set:  41%|████      | 37/90 [01:22<01:11,  1.35s/it]Evaluating checkpoint__best on test set:  42%|████▏     | 38/90 [01:23<01:10,  1.35s/it]Evaluating checkpoint__best on test set:  43%|████▎     | 39/90 [01:24<01:09,  1.35s/it]Evaluating checkpoint__best on test set:  44%|████▍     | 40/90 [01:26<01:07,  1.36s/it]Evaluating checkpoint__best on test set:  46%|████▌     | 41/90 [01:27<01:06,  1.36s/it]Evaluating checkpoint__best on test set:  47%|████▋     | 42/90 [01:28<01:05,  1.35s/it]Evaluating checkpoint__best on test set:  48%|████▊     | 43/90 [01:30<01:03,  1.36s/it]Evaluating checkpoint__best on test set:  49%|████▉     | 44/90 [01:31<01:02,  1.36s/it]Evaluating checkpoint__best on test set:  50%|█████     | 45/90 [01:32<01:01,  1.36s/it]Evaluating checkpoint__best on test set:  51%|█████     | 46/90 [01:34<00:59,  1.36s/it]Evaluating checkpoint__best on test set:  52%|█████▏    | 47/90 [01:35<00:58,  1.36s/it]Evaluating checkpoint__best on test set:  53%|█████▎    | 48/90 [01:36<00:56,  1.35s/it]Evaluating checkpoint__best on test set:  54%|█████▍    | 49/90 [01:38<00:55,  1.36s/it]Evaluating checkpoint__best on test set:  56%|█████▌    | 50/90 [01:39<00:54,  1.36s/it]Evaluating checkpoint__best on test set:  57%|█████▋    | 51/90 [01:41<00:52,  1.36s/it]Evaluating checkpoint__best on test set:  58%|█████▊    | 52/90 [01:42<00:51,  1.36s/it]Evaluating checkpoint__best on test set:  59%|█████▉    | 53/90 [01:43<00:50,  1.36s/it]Evaluating checkpoint__best on test set:  60%|██████    | 54/90 [01:45<00:49,  1.37s/it]Evaluating checkpoint__best on test set:  61%|██████    | 55/90 [01:46<00:47,  1.37s/it]Evaluating checkpoint__best on test set:  62%|██████▏   | 56/90 [01:47<00:47,  1.39s/it]Evaluating checkpoint__best on test set:  63%|██████▎   | 57/90 [01:49<00:46,  1.39s/it]Evaluating checkpoint__best on test set:  64%|██████▍   | 58/90 [01:50<00:44,  1.39s/it]Evaluating checkpoint__best on test set:  66%|██████▌   | 59/90 [01:52<00:43,  1.40s/it]Evaluating checkpoint__best on test set:  67%|██████▋   | 60/90 [01:53<00:41,  1.40s/it]Evaluating checkpoint__best on test set:  68%|██████▊   | 61/90 [01:55<00:40,  1.40s/it]Evaluating checkpoint__best on test set:  69%|██████▉   | 62/90 [01:56<00:38,  1.39s/it]Evaluating checkpoint__best on test set:  70%|███████   | 63/90 [01:57<00:37,  1.39s/it]Evaluating checkpoint__best on test set:  71%|███████   | 64/90 [01:59<00:36,  1.39s/it]Evaluating checkpoint__best on test set:  72%|███████▏  | 65/90 [02:00<00:34,  1.39s/it]Evaluating checkpoint__best on test set:  73%|███████▎  | 66/90 [02:01<00:33,  1.38s/it]Evaluating checkpoint__best on test set:  74%|███████▍  | 67/90 [02:03<00:31,  1.38s/it]Evaluating checkpoint__best on test set:  76%|███████▌  | 68/90 [02:04<00:30,  1.40s/it]Evaluating checkpoint__best on test set:  77%|███████▋  | 69/90 [02:06<00:29,  1.41s/it]Evaluating checkpoint__best on test set:  78%|███████▊  | 70/90 [02:07<00:27,  1.40s/it]Evaluating checkpoint__best on test set:  79%|███████▉  | 71/90 [02:08<00:26,  1.40s/it]Evaluating checkpoint__best on test set:  80%|████████  | 72/90 [02:10<00:25,  1.41s/it]Evaluating checkpoint__best on test set:  81%|████████  | 73/90 [02:11<00:23,  1.41s/it]Evaluating checkpoint__best on test set:  82%|████████▏ | 74/90 [02:13<00:22,  1.41s/it]Evaluating checkpoint__best on test set:  83%|████████▎ | 75/90 [02:14<00:21,  1.41s/it]Evaluating checkpoint__best on test set:  84%|████████▍ | 76/90 [02:15<00:19,  1.40s/it]Evaluating checkpoint__best on test set:  86%|████████▌ | 77/90 [02:17<00:18,  1.42s/it]Evaluating checkpoint__best on test set:  87%|████████▋ | 78/90 [02:18<00:16,  1.41s/it]Evaluating checkpoint__best on test set:  88%|████████▊ | 79/90 [02:20<00:15,  1.41s/it]Evaluating checkpoint__best on test set:  89%|████████▉ | 80/90 [02:21<00:14,  1.42s/it]Evaluating checkpoint__best on test set:  90%|█████████ | 81/90 [02:23<00:12,  1.41s/it]Evaluating checkpoint__best on test set:  91%|█████████ | 82/90 [02:24<00:11,  1.42s/it]Evaluating checkpoint__best on test set:  92%|█████████▏| 83/90 [02:25<00:09,  1.42s/it]Evaluating checkpoint__best on test set:  93%|█████████▎| 84/90 [02:27<00:08,  1.43s/it]Evaluating checkpoint__best on test set:  94%|█████████▍| 85/90 [02:28<00:07,  1.43s/it]Evaluating checkpoint__best on test set:  96%|█████████▌| 86/90 [02:30<00:05,  1.42s/it]Evaluating checkpoint__best on test set:  97%|█████████▋| 87/90 [02:31<00:04,  1.40s/it]Evaluating checkpoint__best on test set:  98%|█████████▊| 88/90 [02:32<00:02,  1.41s/it]Evaluating checkpoint__best on test set:  99%|█████████▉| 89/90 [02:34<00:01,  1.41s/it]Evaluating checkpoint__best on test set: 100%|██████████| 90/90 [02:35<00:00,  1.41s/it]Evaluating checkpoint__best on test set: 100%|██████████| 90/90 [02:35<00:00,  1.73s/it]
+INFO - 02/08/25 20:49:48 - 0:10:10 - ------- IoU --------
+                                     Not Water	 95.080
+                                     Water    	 70.495
+                                     -------------------
+                                     Mean     	 82.788
+INFO - 02/08/25 20:49:48 - 0:10:10 - ------- F1-score --------
+                                     Not Water	 97.478
+                                     Water    	 82.695
+                                     -------------------
+                                     Mean     	 90.086
+INFO - 02/08/25 20:49:48 - 0:10:10 - ------- Precision --------
+                                     Not Water	 97.241
+                                     Water    	 84.102
+                                     -------------------
+                                     Mean     	 90.671
+INFO - 02/08/25 20:49:48 - 0:10:10 - ------- Recall --------
+                                     Not Water	 97.716
+                                     Water    	 81.334
+                                     -------------------
+                                     Mean     	 89.525
+INFO - 02/08/25 20:49:48 - 0:10:10 - Mean Accuracy: 95.598 
+                                     
+wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb:        test_F1_Not Water ▁
+wandb:            test_F1_Water ▁
+wandb:       test_IoU_Not Water ▁
+wandb:           test_IoU_Water ▁
+wandb: test_Precision_Not Water ▁
+wandb:     test_Precision_Water ▁
+wandb:    test_Recall_Not Water ▁
+wandb:        test_Recall_Water ▁
+wandb:                test_mAcc ▁
+wandb:                 test_mF1 ▁
+wandb:                test_mIoU ▁
+wandb: 
+wandb: Run summary:
+wandb:                    epoch 79
+wandb:            learning_rate 1e-05
+wandb:        test_F1_Not Water 97.47801
+wandb:            test_F1_Water 82.69468
+wandb:       test_IoU_Not Water 95.08008
+wandb:           test_IoU_Water 70.49525
+wandb: test_Precision_Not Water 97.24084
+wandb:     test_Precision_Water 84.1021
+wandb:    test_Recall_Not Water 97.71632
+wandb:        test_Recall_Water 81.33358
+wandb:                test_mAcc 95.59758
+wandb:                 test_mF1 90.08635
+wandb:                test_mIoU 82.78766
+wandb:                train_Acc 94.2791
+wandb:               train_loss 0.07428
+wandb:               train_mAcc 70.08381
+wandb:               train_mIoU 61.22514
+wandb:         val_F1_Not Water 97.05676
+wandb:             val_F1_Water 68.83494
+wandb:        val_IoU_Not Water 94.2818
+wandb:            val_IoU_Water 52.47963
+wandb:  val_Precision_Not Water 99.57045
+wandb:      val_Precision_Water 54.31556
+wandb:     val_Recall_Not Water 94.66683
+wandb:         val_Recall_Water 93.94892
+wandb:                 val_mAcc 94.62145
+wandb:                  val_mF1 82.94585
+wandb:                 val_mIoU 73.38071
+wandb: 
+wandb: 🚀 View run 20250207_173536_9dcd22_croma_optical_seg_upernet_sen1floods11 at: https://wandb.ai/g-castiglioni-cornejo/geofm-bench/runs/wkaltj7k
+wandb: ⭐️ View project at: https://wandb.ai/g-castiglioni-cornejo/geofm-bench
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20250208_203914-wkaltj7k/logs

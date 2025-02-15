@@ -29,6 +29,10 @@ from pangaea.utils.utils import (
     seed_worker,
 )
 
+print(f"Available GPUs: {torch.cuda.device_count()}")
+for i in range(torch.cuda.device_count()):
+    print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+
 
 def get_exp_info(hydra_config: HydraConf) -> dict[str, str]:
     """Create a unique experiment name based on the choices made in the config.
@@ -73,6 +77,10 @@ def main(cfg: DictConfig) -> None:
     local_rank = int(os.environ["LOCAL_RANK"])
     device = torch.device("cuda", local_rank)
 
+    if torch.cuda.get_device_name(rank) != 'NVIDIA TITAN RTX' and cfg.finetune:
+        OmegaConf.update(cfg, "batch_size", 4)
+        OmegaConf.update(cfg, "optimizer.lr", 0.00005)
+
     torch.cuda.set_device(device)
     torch.distributed.init_process_group(backend="nccl")
 
@@ -106,7 +114,9 @@ def main(cfg: DictConfig) -> None:
         logger_path = exp_dir / "test.log"
         # load training config
         cfg_path = exp_dir / "configs" / "config.yaml"
+        inference_mode_current = cfg.task.evaluator.inference_mode
         cfg = OmegaConf.load(cfg_path)
+        cfg.task.evaluator.inference_mode = inference_mode_current
         if cfg.task.trainer.use_wandb and rank == 0:
             import wandb
 
@@ -126,8 +136,13 @@ def main(cfg: DictConfig) -> None:
     logger.info(f"Device used: {device}")
 
     encoder: Encoder = instantiate(cfg.encoder)
-    encoder.load_encoder_weights(logger)
-    logger.info("Built {}.".format(encoder.model_name))
+    if cfg.from_scratch and cfg.finetune and train_run:
+            encoder.load_encoder_weights(logger, from_scratch=True)
+            logger.info(f"Built {encoder.model_name} from scratch.")
+    else:
+        encoder.load_encoder_weights(logger)
+        logger.info(f"Built {encoder.model_name} from checkpoint.")
+    
 
     # prepare the decoder (segmentation/regression)
     decoder: Decoder = instantiate(
@@ -241,9 +256,11 @@ def main(cfg: DictConfig) -> None:
             optimizer=optimizer,
             total_iters=len(train_loader) * cfg.task.trainer.n_epochs,
         )
-
+        
         val_evaluator: Evaluator = instantiate(
-            cfg.task.evaluator, val_loader=val_loader, exp_dir=exp_dir, device=device
+            cfg.task.evaluator, val_loader=val_loader, exp_dir=exp_dir, device=device,
+            inference_mode=cfg.task.evaluator.inference_mode,
+            dataset_name=cfg.dataset.dataset_name
         )
         trainer: Trainer = instantiate(
             cfg.task.trainer,
@@ -285,7 +302,9 @@ def main(cfg: DictConfig) -> None:
         collate_fn=collate_fn,
     )
     test_evaluator: Evaluator = instantiate(
-        cfg.task.evaluator, val_loader=test_loader, exp_dir=exp_dir, device=device
+        cfg.task.evaluator, val_loader=test_loader, exp_dir=exp_dir, device=device,
+        inference_mode= cfg.task.evaluator.inference_mode, #'sliding' if train_run else 'whole',
+        dataset_name=cfg.dataset.dataset_name
     )
 
     if cfg.use_final_ckpt:
@@ -297,6 +316,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.use_wandb and rank == 0:
         wandb.finish()
 
+    torch.distributed.destroy_process_group()
 
 if __name__ == "__main__":
     main()

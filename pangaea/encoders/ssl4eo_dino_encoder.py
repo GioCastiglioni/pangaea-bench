@@ -389,24 +389,26 @@ class SSL4EO_DINO_Encoder(Encoder):
 
         return output
 
-    def load_encoder_weights(self, logger: Logger) -> None:
-        checkpoint = torch.load(self.encoder_weights, map_location="cpu")
-        pretrained_model = checkpoint["teacher"]
-        pretrained_model = {
-            k.replace("backbone.", ""): v for k, v in pretrained_model.items()
-        }
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = False) -> None:
+        if not from_scratch:
+            checkpoint = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
+            pretrained_model = checkpoint["teacher"]
+            pretrained_model = {
+                k.replace("backbone.", ""): v for k, v in pretrained_model.items()
+            }
 
-        k = pretrained_model.keys()
-        pretrained_encoder = {}
-        incompatible_shape = {}
-        missing = {}
-        for name, param in self.named_parameters():
-            if name not in k:
-                missing[name] = param.shape
-            elif pretrained_model[name].shape != param.shape:
-                incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
-            else:
-                pretrained_encoder[name] = pretrained_model[name]
+            k = pretrained_model.keys()
+            pretrained_encoder = {}
+            incompatible_shape = {}
+            missing = {}
+            for name, param in self.named_parameters():
+                if name not in k:
+                    missing[name] = param.shape
+                elif pretrained_model[name].shape != param.shape:
+                    incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
+                else:
+                    pretrained_encoder[name] = pretrained_model[name]
 
-        self.load_state_dict(pretrained_encoder, strict=False)
-        self.parameters_warning(missing, incompatible_shape, logger)
+            self.load_state_dict(pretrained_encoder, strict=False)
+            self.parameters_warning(missing, incompatible_shape, logger)
+        else:pass

@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.croptypemapping.CropTypeMappingSouthSudan
 dataset_name: CropTypeMappingSouthSudan
-root_path: ./data/croptypemapping
+root_path: /home/gcastiglioni/datasets/pangaea-bench/croptypemapping
 download_url: https://drive.google.com/drive/folders/1WhVObtFOzYFiXBsbbrEGy1DUtv7ov7wF?usp=sharing
 auto_download: True
 

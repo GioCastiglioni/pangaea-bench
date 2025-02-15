@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.ai4smallfarms.AI4SmallFarms
 dataset_name: AI4SmallFarms
-root_path: ./data/ai4smallfarms
+root_path: /home/gcastiglioni/datasets/pangaea-bench/ai4smallfarms
 download_url: https://phys-techsciences.datastations.nl
 auto_download: True
 

@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.mados.MADOS
 dataset_name: MADOS
-root_path: ./data/mados
+root_path: /home/gcastiglioni/datasets/pangaea-bench/mados
 download_url: https://zenodo.org/records/10664073/files/MADOS.zip?download=1
 auto_download: True
 

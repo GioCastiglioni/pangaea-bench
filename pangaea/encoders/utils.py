@@ -38,7 +38,7 @@ def download_model(download_url=False, encoder_weights=False):
     if download_url:
         if not os.path.isfile(encoder_weights):
             # TODO: change this path
-            os.makedirs("pretrained_models", exist_ok=True)
+            os.makedirs("/home/gcastiglioni/storage/pretrained_models", exist_ok=True)
 
             pbar = DownloadProgressBar(f"Downloading {encoder_weights}")
 

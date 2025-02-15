@@ -51,7 +51,10 @@ class UNet(Encoder):
         self.encoder = UNet_Encoder(self.topology)
 
     def forward(self, image):
-        x = image["optical"].squeeze(2)  # squeeze the time dimension
+        if type(image) is dict:
+            x = image["optical"].squeeze(2) # squeeze the time dimension
+        else:
+            x = image.squeeze(2) # squeeze the time dimension
         feat = self.in_conv(x)
         output = self.encoder(feat)
         return output
