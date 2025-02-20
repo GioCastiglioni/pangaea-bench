@@ -1,0 +1,4 @@
+_target_: pangaea.utils.losses.FocalLoss 
+ignore_index: ${dataset.ignore_index}
+distribution: ${dataset.distribution}
+gamma: 3.0
