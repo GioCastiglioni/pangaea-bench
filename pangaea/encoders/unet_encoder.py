@@ -59,7 +59,7 @@ class UNet(Encoder):
         output = self.encoder(feat)
         return output
 
-    def load_encoder_weights(self, logger: Logger) -> None:
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = True) -> None:
         pass
 
 
@@ -120,7 +120,7 @@ class UNetMT(Encoder):
         output = self.encoder(feat)
         return output
 
-    def load_encoder_weights(self, logger: Logger) -> None:
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = True) -> None:
         pass
 
 
