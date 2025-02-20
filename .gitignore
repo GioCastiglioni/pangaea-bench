@@ -3,6 +3,7 @@
 
 *.log
 
+logs/
 aaa_mystuff/
 work-dir/
 outputs/
