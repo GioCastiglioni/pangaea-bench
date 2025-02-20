@@ -77,10 +77,6 @@ def main(cfg: DictConfig) -> None:
     local_rank = int(os.environ["LOCAL_RANK"])
     device = torch.device("cuda", local_rank)
 
-    if torch.cuda.get_device_name(rank) != 'NVIDIA TITAN RTX' and cfg.finetune:
-        OmegaConf.update(cfg, "batch_size", 4)
-        OmegaConf.update(cfg, "optimizer.lr", 0.00005)
-
     torch.cuda.set_device(device)
     torch.distributed.init_process_group(backend="nccl")
 
@@ -161,6 +157,11 @@ def main(cfg: DictConfig) -> None:
             decoder.module.model_name, type(encoder).__name__
         )
     )
+
+    def non_encoder_params(module):
+        for name, param in module.named_parameters():
+            if not name.startswith("encoder"):
+                yield param
 
     modalities = list(encoder.input_bands.keys())
     collate_fn = get_collate_fn(modalities)
@@ -250,7 +251,14 @@ def main(cfg: DictConfig) -> None:
         )
 
         criterion = instantiate(cfg.criterion)
-        optimizer = instantiate(cfg.optimizer, params=decoder.parameters())
+
+        params = [{'params': non_encoder_params(decoder.module), 'lr': cfg.optimizer.lr}]
+        if cfg.finetune:
+            params.append({'params': decoder.module.encoder.parameters(), 'lr': cfg.optimizer.lr * cfg.ft_rate})
+
+        optimizer = instantiate(cfg.optimizer, params=None)
+        optimizer = optimizer(params=params)
+
         lr_scheduler = instantiate(
             cfg.lr_scheduler,
             optimizer=optimizer,

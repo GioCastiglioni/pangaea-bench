@@ -498,20 +498,19 @@ class Trainer:
             self.t = time.time()
             self.train_loader.sampler.set_epoch(epoch)
             self.train_one_epoch(epoch)
-            if epoch % self.ckpt_interval == 0 and epoch != self.start_epoch:
-                self.save_model(epoch)
+            if epoch % self.ckpt_interval == 0 and epoch != self.start_epoch: self.save_model(epoch)
             torch.cuda.empty_cache()
 
         metrics, used_time = self.evaluator(self.model, "final model")
         self.training_stats["eval_time"].update(used_time)
         self.save_best_checkpoint(metrics, self.n_epochs)
 
+        # save last model
+        self.save_model(self.n_epochs, is_final=True)
+
         del metrics
         del used_time
         torch.cuda.empty_cache()
-
-        # save last model
-        self.save_model(self.n_epochs, is_final=True)
 
     def train_one_epoch(self, epoch: int) -> None:
         """Train model for one epoch.
