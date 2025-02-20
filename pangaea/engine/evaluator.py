@@ -204,7 +204,7 @@ class SegEvaluator(Evaluator):
         result = result.transpose(2, 3).transpose(1, 2)
         return result
 
-    #@torch.no_grad()
+    @torch.no_grad()
     def evaluate(self, model, model_name='model', model_ckpt_path=None):
         t = time.time()
 
@@ -301,7 +301,7 @@ class SegEvaluator(Evaluator):
 
         return metrics, used_time
 
-    #@torch.no_grad()
+    @torch.no_grad()
     def __call__(self, model, model_name, model_ckpt_path=None):
         return self.evaluate(model, model_name, model_ckpt_path)
 
