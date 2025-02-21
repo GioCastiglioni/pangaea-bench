@@ -100,7 +100,7 @@ class Encoder(nn.Module):
         # download_model if necessary
         self.download_model()
 
-    def load_encoder_weights(self, logger: Logger) -> None:
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = False) -> None:
         """Load the encoder weights.
 
         Args:

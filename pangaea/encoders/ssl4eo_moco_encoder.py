@@ -118,28 +118,30 @@ class SSL4EO_MOCO_Encoder(Encoder):
         self.pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
         self.pos_embed.requires_grad = False
 
-    def load_encoder_weights(self, logger: Logger) -> None:
-        checkpoint = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
-        pretrained_model = checkpoint["state_dict"]
-        pretrained_model = {
-            k.replace("module.base_encoder.", ""): v
-            for k, v in pretrained_model.items()
-        }
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = False) -> None:
+        if not from_scratch:
+            checkpoint = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
+            pretrained_model = checkpoint["state_dict"]
+            pretrained_model = {
+                k.replace("module.base_encoder.", ""): v
+                for k, v in pretrained_model.items()
+            }
 
-        k = pretrained_model.keys()
-        pretrained_encoder = {}
-        incompatible_shape = {}
-        missing = {}
-        for name, param in self.named_parameters():
-            if name not in k:
-                missing[name] = param.shape
-            elif pretrained_model[name].shape != param.shape:
-                incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
-            else:
-                pretrained_encoder[name] = pretrained_model[name]
+            k = pretrained_model.keys()
+            pretrained_encoder = {}
+            incompatible_shape = {}
+            missing = {}
+            for name, param in self.named_parameters():
+                if name not in k:
+                    missing[name] = param.shape
+                elif pretrained_model[name].shape != param.shape:
+                    incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
+                else:
+                    pretrained_encoder[name] = pretrained_model[name]
 
-        self.load_state_dict(pretrained_encoder, strict=False)
-        self.parameters_warning(missing, incompatible_shape, logger)
+            self.load_state_dict(pretrained_encoder, strict=False)
+            self.parameters_warning(missing, incompatible_shape, logger)
+        else:pass
 
     def forward(self, image):
         x = image["optical"].squeeze(2)

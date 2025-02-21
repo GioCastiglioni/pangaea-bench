@@ -488,59 +488,60 @@ class SatlasNet_Encoder(Encoder):
 
         return backbone
 
-    def load_encoder_weights(self, logger: Logger) -> None:
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = False) -> None:
         """
         Find and load pretrained SatlasPretrain weights, based on the model_identifier argument.
         Option to load pretrained FPN.
         """
+        if not from_scratch:
+            response = requests.get(self.weights_url)
+            if response.status_code == 200:
+                weights_file = BytesIO(response.content)
+            else:
+                raise Exception(f"Failed to download weights from {self.weights_url}")
 
-        response = requests.get(self.weights_url)
-        if response.status_code == 200:
-            weights_file = BytesIO(response.content)
-        else:
-            raise Exception(f"Failed to download weights from {self.weights_url}")
+            pretrained_model = torch.load(weights_file, map_location=torch.device("cpu"), weights_only=False)
 
-        pretrained_model = torch.load(weights_file, map_location=torch.device("cpu"), weights_only=False)
+            # If using a model for multi-image, need the Aggretation to wrap underlying backbone model.
+            prefix, prefix_allowed_count = None, None
+            if self.backbone_arch in ["Backbone.RESNET50", "Backbone.RESNET152"]:
+                prefix_allowed_count = 0
+            elif self.multi_image:
+                prefix_allowed_count = 2
+            else:
+                prefix_allowed_count = 1
 
-        # If using a model for multi-image, need the Aggretation to wrap underlying backbone model.
-        prefix, prefix_allowed_count = None, None
-        if self.backbone_arch in ["Backbone.RESNET50", "Backbone.RESNET152"]:
-            prefix_allowed_count = 0
-        elif self.multi_image:
-            prefix_allowed_count = 2
-        else:
-            prefix_allowed_count = 1
-
-        state_dict_backbone = adjust_state_dict_prefix(
-            pretrained_model, "backbone", "backbone.", prefix_allowed_count
-        )
-
-        missing = {}
-        incompatible_shape = {}
-        for name, param in self.backbone.named_parameters():
-            if name not in state_dict_backbone:
-                missing[name] = param.shape
-            elif state_dict_backbone[name].shape != param.shape:
-                incompatible_shape[name] = (
-                    param.shape,
-                    state_dict_backbone[name].shape,
-                )
-
-        self.backbone.load_state_dict(state_dict_backbone)
-
-        if self.fpn:
-            state_dict_fpn = adjust_state_dict_prefix(
-                pretrained_model, "fpn", "intermediates.0.", 0
+            state_dict_backbone = adjust_state_dict_prefix(
+                pretrained_model, "backbone", "backbone.", prefix_allowed_count
             )
-            for name, param in self.fpn.named_parameters():
-                if name not in state_dict_fpn:
+
+            missing = {}
+            incompatible_shape = {}
+            for name, param in self.backbone.named_parameters():
+                if name not in state_dict_backbone:
                     missing[name] = param.shape
-                elif state_dict_fpn[name].shape != param.shape:
-                    incompatible_shape[name] = (param.shape, state_dict_fpn[name].shape)
+                elif state_dict_backbone[name].shape != param.shape:
+                    incompatible_shape[name] = (
+                        param.shape,
+                        state_dict_backbone[name].shape,
+                    )
 
-            self.fpn.load_state_dict(state_dict_fpn)
+            self.backbone.load_state_dict(state_dict_backbone)
 
-        self.parameters_warning(missing, incompatible_shape, logger)
+            if self.fpn:
+                state_dict_fpn = adjust_state_dict_prefix(
+                    pretrained_model, "fpn", "intermediates.0.", 0
+                )
+                for name, param in self.fpn.named_parameters():
+                    if name not in state_dict_fpn:
+                        missing[name] = param.shape
+                    elif state_dict_fpn[name].shape != param.shape:
+                        incompatible_shape[name] = (param.shape, state_dict_fpn[name].shape)
+
+                self.fpn.load_state_dict(state_dict_fpn)
+
+            self.parameters_warning(missing, incompatible_shape, logger)
+        else:pass
 
     def forward(self, imgs):
         # Define forward pass

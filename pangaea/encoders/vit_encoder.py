@@ -113,25 +113,27 @@ class VIT_Encoder(Encoder):
 
         return output
 
-    def load_encoder_weights(self, logger: Logger) -> None:
-        if self.encoder_weights is None:
-            return
-        pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
-        k = pretrained_model.keys()
-        pretrained_encoder = {}
-        incompatible_shape = {}
-        missing = {}
-        for name, param in self.named_parameters():
-            if name not in k:
-                missing[name] = param.shape
-            elif pretrained_model[name].shape != param.shape:
-                incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
-                pretrained_model.pop(name)
-            else:
-                pretrained_encoder[name] = pretrained_model.pop(name)
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = False) -> None:
+        if not from_scratch:
+            if self.encoder_weights is None:
+                return
+            pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
+            k = pretrained_model.keys()
+            pretrained_encoder = {}
+            incompatible_shape = {}
+            missing = {}
+            for name, param in self.named_parameters():
+                if name not in k:
+                    missing[name] = param.shape
+                elif pretrained_model[name].shape != param.shape:
+                    incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
+                    pretrained_model.pop(name)
+                else:
+                    pretrained_encoder[name] = pretrained_model.pop(name)
 
-        self.load_state_dict(pretrained_encoder, strict=False)
-        self.parameters_warning(missing, incompatible_shape, logger)
+            self.load_state_dict(pretrained_encoder, strict=False)
+            self.parameters_warning(missing, incompatible_shape, logger)
+        else:pass
 
 
 class VIT_EncoderMT(Encoder):
@@ -235,22 +237,24 @@ class VIT_EncoderMT(Encoder):
 
         return output
 
-    def load_encoder_weights(self, logger: Logger) -> None:
-        if self.encoder_weights is None:
-            return
-        pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
-        k = pretrained_model.keys()
-        pretrained_encoder = {}
-        incompatible_shape = {}
-        missing = {}
-        for name, param in self.named_parameters():
-            if name not in k:
-                missing[name] = param.shape
-            elif pretrained_model[name].shape != param.shape:
-                incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
-                pretrained_model.pop(name)
-            else:
-                pretrained_encoder[name] = pretrained_model.pop(name)
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = False) -> None:
+        if not from_scratch:
+            if self.encoder_weights is None:
+                return
+            pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)
+            k = pretrained_model.keys()
+            pretrained_encoder = {}
+            incompatible_shape = {}
+            missing = {}
+            for name, param in self.named_parameters():
+                if name not in k:
+                    missing[name] = param.shape
+                elif pretrained_model[name].shape != param.shape:
+                    incompatible_shape[name] = (param.shape, pretrained_model[name].shape)
+                    pretrained_model.pop(name)
+                else:
+                    pretrained_encoder[name] = pretrained_model.pop(name)
 
-        self.load_state_dict(pretrained_encoder, strict=False)
-        self.parameters_warning(missing, incompatible_shape, logger)
+            self.load_state_dict(pretrained_encoder, strict=False)
+            self.parameters_warning(missing, incompatible_shape, logger)
+        else: pass
