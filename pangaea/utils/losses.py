@@ -6,7 +6,7 @@ class WeightedCrossEntropy(torch.nn.Module):
     def __init__(self, ignore_index: int, distribution: list[float]) -> None:
         super(WeightedCrossEntropy, self).__init__()
         # Initialize the weights based on the given distribution
-        self.weights = [1 / w for w in distribution]
+        self.weights = [1 / w if w!=0 else 0 for w in distribution]
 
         # Convert weights to a tensor and move to CUDA
         loss_weights = torch.Tensor(self.weights).to("cuda")
@@ -62,13 +62,13 @@ class FocalLoss(torch.nn.Module):
     def __init__(self, ignore_index: int, distribution: list[float], gamma: float = 2.0) -> None:
         super(FocalLoss, self).__init__()
         # Initialize the weights based on the given distribution
-        self.weights = [1 / w for w in distribution]
+        #self.weights = [1 / w if w!=0 else 0 for w in distribution]
 
         # Convert weights to a tensor and move to CUDA
-        loss_weights = torch.Tensor(self.weights).to("cuda")
+        #loss_weights = torch.Tensor(self.weights).to("cuda")
         self.gamma = gamma
         self.loss = torch.nn.CrossEntropyLoss(
-            ignore_index=ignore_index, weight=loss_weights, reduction='none'
+            ignore_index=ignore_index, reduction='none', # weight=loss_weights, 
         )
 
     def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
