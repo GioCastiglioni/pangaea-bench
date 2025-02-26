@@ -35,6 +35,39 @@ class PositionalEncoder(nn.Module):
 
         return sinusoid_table
 
+class LTAEChannelAdaptorOut(nn.Module):
+    def __init__(self, in_channels: int, out_channels: list[int]) -> None:
+        """LTAEChannelAdaptor for reducing channels progressively.
+
+        Args:
+            in_channels (int): Fixed number of input channels for all feature maps.
+            out_channels (list[int]): Desired output channels for each feature map.
+        """
+        super(LTAEChannelAdaptorOut, self).__init__()
+        assert isinstance(out_channels, list), "out_channels must be a list"
+        
+        # Create a 1x1 conv for each feature map, reducing its channels
+        self.convs = nn.ModuleList(
+            [
+                nn.Conv2d(in_channels, out_c, kernel_size=1)
+                for out_c in out_channels
+            ]
+        )
+
+    def forward(self, features: list[torch.Tensor]) -> list[torch.Tensor]:
+        """Adapt features from a fixed input channel size to different output sizes.
+
+        Args:
+            features (list[torch.Tensor]): List of feature maps (all with shape B, 512, H, W).
+
+        Returns:
+            list[torch.Tensor]: List of feature maps with adjusted channels.
+        """
+        assert len(features) == len(self.convs), (
+            f"Expected {len(self.convs)} feature maps, but got {len(features)}."
+        )
+        
+        return [conv(f) for conv, f in zip(self.convs, features)]
 
 
 class LTAEChannelAdaptor(nn.Module):

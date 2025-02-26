@@ -124,6 +124,71 @@ class UNetMT(Encoder):
         pass
 
 
+
+class UTAE_Encoder(Encoder):
+    """
+    Multi Temporal UTAE Encoder for Supervised Baseline, to be trained from scratch.
+    It supports single time frame inputs with optical bands
+
+    Args:
+        input_bands (dict[str, list[str]]): Band names, specifically expecting the 'optical' key with a list of bands.
+        input_size (int): Size of the input images (height and width).
+        topology (Sequence[int]): The number of feature channels at each stage of the U-Net encoder.
+
+    """
+
+    def __init__(
+        self,
+        input_bands: dict[str, list[str]],
+        input_size: int,
+        multi_temporal: int,
+        topology: Sequence[int],
+        output_dim: int | list[int],
+        download_url: str,
+        encoder_weights: str | None = None,
+    ):
+        super().__init__(
+            model_name="utae_encoder",
+            encoder_weights=encoder_weights,  # no pre-trained weights, train from scratch
+            input_bands=input_bands,
+            input_size=input_size,
+            embed_dim=0,
+            output_dim=output_dim,
+            output_layers=None,
+            multi_temporal=multi_temporal,
+            multi_temporal_output=False,
+            pyramid_output=True,
+            download_url=download_url,
+        )
+
+        self.in_channels = len(input_bands["optical"])  # number of optical bands
+        self.topology = topology
+
+        self.in_conv = InConv(self.in_channels, self.topology[0], DoubleConv)
+        self.encoder = UNet_Encoder(self.topology)
+
+    def forward(self, image):
+        x = image["optical"]
+        b, c, t, h, w = x.shape
+
+        feats=[]
+        for i in range(t):
+            feat = self.encoder.forward(self.in_conv(x[:,:,i,:,:]), unsq=True)
+
+            #[block_1_T_i, ..., block_n_T_i]
+            feats.append(feat)
+        
+        #feat = [[x_1, block_1_T_1, ..., block_n_T_1], ..., [x_tau, block_1_T_tau, ..., block_n_T_tau]]
+        feats = [list(feat) for feat in zip(*feats)]
+        
+        #feats = [[x_1, ..., x_tau], [block_1_T_1, ..., block_1_T_tau], ..., [block_n_T_1, ..., block_n_T_tau]]
+        feats = list(reversed([torch.cat(feat_layers, dim=2) for feat_layers in feats]))
+        
+        return feats
+
+    def load_encoder_weights(self, logger: Logger, from_scratch: bool = True) -> None:
+        pass
+
 class UNet_Encoder(nn.Module):
     """
     UNet Encoder class that defines the architecture of the encoder part of the UNet.
@@ -154,11 +219,18 @@ class UNet_Encoder(nn.Module):
             down_dict[f"down{idx + 1}"] = layer
         self.down_seq = nn.ModuleDict(down_dict)
 
-    def forward(self, x1: torch.Tensor) -> list:
-        inputs = [x1]
-        for layer in self.down_seq.values():
-            out = layer(inputs[-1])
-            inputs.append(out)
+    def forward(self, x1: torch.Tensor, unsq: bool = False) -> list:
+        
+        if not unsq:
+            inputs = [x1]
+            for layer in self.down_seq.values():
+                out = layer(inputs[-1])
+                inputs.append(out)
+        else:
+            inputs = [x1.unsqueeze(2)]
+            for layer in self.down_seq.values():
+                out = layer(inputs[-1].squeeze(2))
+                inputs.append(out.unsqueeze(2))
 
         inputs.reverse()
         return inputs

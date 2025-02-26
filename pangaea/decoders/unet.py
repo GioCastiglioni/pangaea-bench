@@ -2,10 +2,13 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 
+from copy import deepcopy
+
 from collections import OrderedDict
 from typing import Sequence
 from pangaea.decoders.base import Decoder
 from pangaea.encoders.base import Encoder
+from pangaea.decoders.ltae import LTAE2d, LTAEChannelAdaptor, LTAEChannelAdaptorOut
 
 
 class UNet(Decoder):
@@ -52,6 +55,88 @@ class UNet(Decoder):
         output = self.conv_seg(feat)
         # output = F.interpolate(output, size=output_shape, mode='bilinear')
         return output
+
+
+class UTAE(Decoder):
+    """
+    UNet implementation designed for supervised semantic segmentation tasks. 
+
+    Key Features:
+    - Fully supervised: Requires training from scratch, with no pre-trained weights used.
+    - Single temporal input: Designed to process single-frame inputs.
+
+    Args:
+        encoder (Encoder): The encoder module (U-TAE's down-sampling path), expected to provide feature maps at multiple scales.
+        num_classes (int): Number of output classes for segmentation.
+        finetune (bool): Whether the model is to be fine-tuned (should always be true for UNet).
+
+    Returns:
+        torch.Tensor: Output segmentation map.
+    """
+
+    def __init__(
+        self,
+        encoder: Encoder,
+        num_classes: int,
+        finetune: bool,
+    ):
+        
+
+        super().__init__(
+            encoder=encoder,
+            num_classes=num_classes,
+            finetune=finetune,
+        )
+        assert self.finetune  # the UNet encoder should always be trained
+
+        self.model_name = 'UTAE_SemanticSegmentation'
+        self.align_corners = False
+        self.topology = encoder.topology
+
+        self.decoder = UNet_Decoder(self.topology, utae=True)
+        self.conv_seg = OutConv(self.topology[0], self.num_classes)
+
+        self.ltae_adaptor = self.construct_adaptor(encoder.output_dim)
+
+        self.ltae = LTAE2d(
+                    positional_encoding=False,
+                    in_channels=self.topology[-1],
+                    mlp=[self.topology[-1], self.topology[-1]],
+                    d_model=self.topology[-1],
+                )
+
+        self.ltae_out_adaptor = self.construct_out_adaptor(encoder.output_dim)
+
+    def forward(self, img, output_shape=None):
+        """Forward function."""
+        feats = self.encoder(img)
+        feats = self.ltae_adaptor(feats)
+        feats = list(reversed([self.ltae(feat_layer) for feat_layer in feats]))
+        feats = self.ltae_out_adaptor(feats)
+        feats = self.decoder(feats)
+        output = self.conv_seg(feats)
+        return output
+    
+    def construct_adaptor(self, output_dim):
+        encoder_out_channels = deepcopy(output_dim)
+        encoder_out_channels.append(encoder_out_channels[-1])
+        decoder_in_channels = [max(encoder_out_channels) for _ in encoder_out_channels]
+
+        return LTAEChannelAdaptor(
+            in_channels=encoder_out_channels,
+            out_channels=decoder_in_channels,
+            )
+
+    def construct_out_adaptor(self, output_dim):
+        encoder_out_channels = deepcopy(output_dim)
+        encoder_out_channels.append(encoder_out_channels[-1])
+        encoder_out_channels = list(reversed(encoder_out_channels))
+
+        return LTAEChannelAdaptorOut(
+            in_channels=max(encoder_out_channels),
+            out_channels=encoder_out_channels,
+            )
+
 
 
 class SiamUNet(Decoder):
@@ -152,7 +237,7 @@ class SiamConcUNet(SiamUNet):
 
 
 class UNet_Decoder(nn.Module):
-    def __init__(self, topology: Sequence[int]):
+    def __init__(self, topology: Sequence[int], utae: bool = False):
         super(UNet_Decoder, self).__init__()
 
         self.topology = topology
@@ -174,7 +259,7 @@ class UNet_Decoder(nn.Module):
             x2_idx = idx - 1 if is_not_last_layer else idx
             in_dim = up_topo[x1_idx] * 2
             out_dim = up_topo[x2_idx]
-            layer = Up(in_dim, out_dim, DoubleConv)
+            layer = Up(in_dim, out_dim, DoubleConv) if not utae else UpTAE(in_dim, out_dim, DoubleConv)
             up_dict[f'up{idx + 1}'] = layer
 
         self.up_seq = nn.ModuleDict(up_dict)
@@ -230,6 +315,32 @@ class Up(nn.Module):
 
         x = torch.cat([x2, x1], dim=1)
         x = self.conv(x)
+        return x
+
+class UpTAE(nn.Module):
+    def __init__(self, in_ch, out_ch, conv_block):
+        super(Up, self).__init__()
+
+        self.up = nn.ConvTranspose2d(in_ch // 2, in_ch // 2, 2, stride=2)
+        self.conv = conv_block(in_ch, out_ch)
+        self.batch_norm = nn.BatchNorm2d(in_ch)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+
+        # input is CHW
+        diffY = x2.detach().size()[2] - x1.detach().size()[2]
+        diffX = x2.detach().size()[3] - x1.detach().size()[3]
+
+        x1 = F.pad(x1, (diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2))
+
+        # for padding issues, see
+        # https://github.com/HaiyongJiang/U-Net-Pytorch-Unstructured-Buggy/commit/0e854509c2cea854e247a9c615f175f76fbb2e3a
+        # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
+
+        x = torch.cat([x2, x1], dim=1)
+        x = self.conv(self.relu(self.batch_norm(x)))
         return x
 
 

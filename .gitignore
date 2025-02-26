@@ -3,6 +3,8 @@
 
 *.log
 
+multirun/
+
 logs/
 aaa_mystuff/
 work-dir/
