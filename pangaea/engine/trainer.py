@@ -147,7 +147,7 @@ class PreTrainer:
         torch.cuda.empty_cache()
 
         # save last model
-        self.save_model(self.n_epochs, is_final=True)
+        # self.save_model(self.n_epochs, is_final=True)
 
     def train_one_epoch(self, epoch: int) -> None:
         """Train model for one epoch.
