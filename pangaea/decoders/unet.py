@@ -319,7 +319,7 @@ class Up(nn.Module):
 
 class UpTAE(nn.Module):
     def __init__(self, in_ch, out_ch, conv_block):
-        super(Up, self).__init__()
+        super(UpTAE, self).__init__()
 
         self.up = nn.ConvTranspose2d(in_ch // 2, in_ch // 2, 2, stride=2)
         self.conv = conv_block(in_ch, out_ch)
