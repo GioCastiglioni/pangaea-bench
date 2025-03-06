@@ -173,9 +173,9 @@ class Dummy(RawGeoFMDataset):
             folds = [4]
         else:
             folds = [5]
-        self.modalities = ["s2"]
+        self.modalities = ["S2"]
 
-        reference_date = "2018-09-01"
+        reference_date = "2017-06-01"
         self.reference_date = datetime(*map(int, reference_date.split("-")))
 
         self.num_classes = 10
@@ -192,41 +192,42 @@ class Dummy(RawGeoFMDataset):
 
         self.len = self.meta_patch.shape[0]
         self.id_patches = self.meta_patch.index
-        self.sats = ["S2"]
+        self.date_tables = {s: None for s in self.modalities}
 
-        s = "S2"
-        dates = self.meta_patch["dates-{}".format(s)]
-        self.date_range = np.array(range(-200, 600))
+        for s in self.modalities:
+            dates = self.meta_patch["dates-{}".format(s)]
+            self.date_range = np.array(range(-200, 600))
 
-        date_table = pd.DataFrame(
-            index=self.meta_patch.index, columns=self.date_range, dtype=int
-        )
-        for pid, date_seq in dates.items():
-            if type(date_seq) == str:
-                date_seq = json.loads(date_seq)
-            d = pd.DataFrame().from_dict(date_seq, orient="index")
-            d = d[0].apply(
-                lambda x: (
-                    datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:]))
-                    - self.reference_date
-                ).days
+            date_table = pd.DataFrame(
+                index=self.meta_patch.index, columns=self.date_range, dtype=int
             )
-            date_table.loc[pid, d.values] = 1
-        date_table = date_table.fillna(0)
-        self.date_tables[s] = {
-            index: np.array(list(d.values()))
-            for index, d in date_table.to_dict(orient="index").items()
-        }
+            for pid, date_seq in dates.items():
+                if type(date_seq) == str:
+                    date_seq = json.loads(date_seq)
+                d = pd.DataFrame().from_dict(date_seq, orient="index")
+                d = d[0].apply(
+                    lambda x: (
+                        datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:]))
+                        - self.reference_date
+                    ).days
+                )
+                date_table.loc[pid, d.values] = 1
+            date_table = date_table.fillna(0)
+            self.date_tables[s] = {
+                index: np.array(list(d.values()))
+                for index, d in date_table.to_dict(orient="index").items()
+            }
 
         print("Done.")
 
     def __len__(self):
         return self.len
     
-  
-
     def get_dates(self, id_patch, sat):
-        return self.date_range[np.where(self.date_tables[sat][id_patch] == 1)[0]]
+        indices = np.where(self.date_tables[sat][id_patch] == 1)[0]
+        indices = indices[indices < len(self.date_range)]  # Ensure indices are within bounds
+        return torch.tensor(self.date_range[indices], dtype=torch.int32)
+
 
     def __getitem__(self, i: int) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
         """Get the item at index i.
@@ -248,23 +249,23 @@ class Dummy(RawGeoFMDataset):
         target = torch.from_numpy(
             np.load(
                 os.path.join(self.root_path, "ANNOTATIONS/TARGET_" + str(name) + ".npy")
-            )[0].astype(np.int32)
+            ).astype(np.int32)
         )
         # only for s2
         modality_name = "S2"
         data = {
                 modality_name: np.load(
                     os.path.join(
-                        self.folder,
+                        self.root_path,
                         "DATA_{}".format(modality_name),
                         "{}_{}.npy".format(modality_name, name),
                     )
-                ).astype(torch.float32)
+                ).astype(np.float32)
         }
         data = {s: torch.from_numpy(a) for s, a in data.items()}
 
         dates = {
-                s: torch.from_numpy(self.get_dates(id_patch, s)) for s in self.sats
+                s: self.get_dates(id_patch, s) for s in self.modalities
             }
         # output[modality_name] = images
         # optical_ts = rearrange(output["s2"], "t c h w -> c t h w")
@@ -279,19 +280,13 @@ class Dummy(RawGeoFMDataset):
 
         return {
             "image": {
-                "optical": optical_ts.to(torch.float32),
-            },
+                    "optical": {s: a.to(torch.float32) for s, a in data.items()},
+                    },
+
             "target": target.to(torch.int64),
-            "dates": {},
+            "dates": {s: dates[s].to(torch.int32) for s in self.modalities},
         }
 
-    # def __len__(self) -> int:
-    #     """Return the length of the dataset.
-
-    #     Returns:
-    #         int: length of the dataset.
-    #     """
-    #     return len(self.meta_patch) * self.nb_split * self.nb_split
 
     @staticmethod
     def download():
