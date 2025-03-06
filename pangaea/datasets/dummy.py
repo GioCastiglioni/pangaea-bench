@@ -30,41 +30,73 @@ def prepare_dates(date_dict, reference_date):
     )
     return torch.tensor(d.values)
 
-
-def split_image(image_tensor, nb_split, id):
-    """
-    Split the input image tensor into four quadrants based on the integer i.
-    To use if Pastis data does not fit in your GPU memory.
-    Returns the corresponding quadrant based on the value of i
-    """
-    if nb_split == 1:
-        return image_tensor
-    i1 = id // nb_split
-    i2 = id % nb_split
-    height, width = image_tensor.shape[-2:]
-    half_height = height // nb_split
-    half_width = width // nb_split
-    if image_tensor.dim() == 4:
-        return image_tensor[
-            :,
-            :,
-            i1 * half_height : (i1 + 1) * half_height,
-            i2 * half_width : (i2 + 1) * half_width,
-        ].float()
-    if image_tensor.dim() == 3:
-        return image_tensor[
-            :,
-            i1 * half_height : (i1 + 1) * half_height,
-            i2 * half_width : (i2 + 1) * half_width,
-        ].float()
-    if image_tensor.dim() == 2:
-        return image_tensor[
-            i1 * half_height : (i1 + 1) * half_height,
-            i2 * half_width : (i2 + 1) * half_width,
-        ].float()
+# def prepare_dates(date_dict, reference_date):
+#     d = pd.DataFrame().from_dict(date_dict, orient="index")
+#     d = d[0].apply(
+#         lambda x: (
+#             datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:]))
+#             - reference_date
+#         ).days
+#     )
+#     return d.values
 
 
-class Pastis(RawGeoFMDataset):
+# def compute_norm_vals(folder, sat):
+#     norm_vals = {}
+#     for fold in range(1, 6):
+#         dt = Dummy(folder=folder, norm=False, folds=[fold], sats=[sat])
+#         means = []
+#         stds = []
+#         for i, b in enumerate(dt):
+#             print("{}/{}".format(i, len(dt)), end="\r")
+#             data = b[0][0][sat]  # T x C x H x W
+#             data = data.permute(1, 0, 2, 3).contiguous()  # C x B x T x H x W
+#             means.append(data.view(data.shape[0], -1).mean(dim=-1).numpy())
+#             stds.append(data.view(data.shape[0], -1).std(dim=-1).numpy())
+
+#         mean = np.stack(means).mean(axis=0).astype(float)
+#         std = np.stack(stds).mean(axis=0).astype(float)
+
+#         norm_vals["Fold_{}".format(fold)] = dict(mean=list(mean), std=list(std))
+
+#     with open(os.path.join(folder, "NORM_{}_patch.json".format(sat)), "w") as file:
+#         file.write(json.dumps(norm_vals, indent=4))
+
+
+# def split_image(image_tensor, nb_split, id):
+#     """
+#     Split the input image tensor into four quadrants based on the integer i.
+#     To use if Pastis data does not fit in your GPU memory.
+#     Returns the corresponding quadrant based on the value of i
+#     """
+#     if nb_split == 1:
+#         return image_tensor
+#     i1 = id // nb_split
+#     i2 = id % nb_split
+#     height, width = image_tensor.shape[-2:]
+#     half_height = height // nb_split
+#     half_width = width // nb_split
+#     if image_tensor.dim() == 4:
+#         return image_tensor[
+#             :,
+#             :,
+#             i1 * half_height : (i1 + 1) * half_height,
+#             i2 * half_width : (i2 + 1) * half_width,
+#         ].float()
+#     if image_tensor.dim() == 3:
+#         return image_tensor[
+#             :,
+#             i1 * half_height : (i1 + 1) * half_height,
+#             i2 * half_width : (i2 + 1) * half_width,
+#         ].float()
+#     if image_tensor.dim() == 2:
+#         return image_tensor[
+#             i1 * half_height : (i1 + 1) * half_height,
+#             i2 * half_width : (i2 + 1) * half_width,
+#         ].float()
+
+
+class Dummy(RawGeoFMDataset):
     def __init__(
         self,
         split: str,
@@ -114,7 +146,7 @@ class Pastis(RawGeoFMDataset):
             download_url (str): url to download the dataset.
             auto_download (bool): whether to download the dataset automatically.
         """
-        super(Pastis, self).__init__(
+        super(Dummy, self).__init__(
             split=split,
             dataset_name=dataset_name,
             multi_modal=multi_modal,
@@ -141,22 +173,60 @@ class Pastis(RawGeoFMDataset):
             folds = [4]
         else:
             folds = [5]
-        self.modalities = ["s2", "aerial", "s1-asc"]
-        self.nb_split = 1
+        self.modalities = ["s2"]
 
         reference_date = "2018-09-01"
         self.reference_date = datetime(*map(int, reference_date.split("-")))
 
-        self.meta_patch = gpd.read_file(
-            os.path.join(self.root_path, "metadata.geojson")
-        )
+        self.num_classes = 10
 
-        self.num_classes = 20
-
+        print("Reading patch metadata . . .")
+        self.meta_patch = gpd.read_file(os.path.join(root_path, "metadata.geojson"))
         if folds is not None:
             self.meta_patch = pd.concat(
                 [self.meta_patch[self.meta_patch["Fold"] == f] for f in folds]
             )
+        self.meta_patch.index = self.meta_patch["id"].astype(int)
+        self.meta_patch.sort_index(inplace=True)
+        self.memory_dates = {}
+
+        self.len = self.meta_patch.shape[0]
+        self.id_patches = self.meta_patch.index
+        self.sats = ["S2"]
+
+        s = "S2"
+        dates = self.meta_patch["dates-{}".format(s)]
+        self.date_range = np.array(range(-200, 600))
+
+        date_table = pd.DataFrame(
+            index=self.meta_patch.index, columns=self.date_range, dtype=int
+        )
+        for pid, date_seq in dates.items():
+            if type(date_seq) == str:
+                date_seq = json.loads(date_seq)
+            d = pd.DataFrame().from_dict(date_seq, orient="index")
+            d = d[0].apply(
+                lambda x: (
+                    datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:]))
+                    - self.reference_date
+                ).days
+            )
+            date_table.loc[pid, d.values] = 1
+        date_table = date_table.fillna(0)
+        self.date_tables[s] = {
+            index: np.array(list(d.values()))
+            for index, d in date_table.to_dict(orient="index").items()
+        }
+
+        print("Done.")
+
+    def __len__(self):
+        return self.len
+    
+  
+
+    def get_dates(self, id_patch, sat):
+        return self.date_range[np.where(self.date_tables[sat][id_patch] == 1)[0]]
 
     def __getitem__(self, i: int) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
         """Get the item at index i.
@@ -172,207 +242,56 @@ class Pastis(RawGeoFMDataset):
             "target": torch.Tensor,
              "metadata": dict}.
         """
-        line = self.meta_patch.iloc[i // (self.nb_split * self.nb_split)]
-        name = line["ID_PATCH"]
-        part = i % (self.nb_split * self.nb_split)
-        label = torch.from_numpy(
+        line = self.meta_patch.iloc[i]
+        id_patch = self.id_patches[i]
+        name = line["id"]
+        target = torch.from_numpy(
             np.load(
                 os.path.join(self.root_path, "ANNOTATIONS/TARGET_" + str(name) + ".npy")
             )[0].astype(np.int32)
         )
-        output = {"label": label, "name": name}
-
-        for modality in self.modalities:
-            if modality == "aerial":
-                with rasterio.open(
+        # only for s2
+        modality_name = "S2"
+        data = {
+                modality_name: np.load(
                     os.path.join(
-                        self.root_path,
-                        "DATA_SPOT/PASTIS_SPOT6_RVB_1M00_2019/SPOT6_RVB_1M00_2019_"
-                        + str(name)
-                        + ".tif",
+                        self.folder,
+                        "DATA_{}".format(modality_name),
+                        "{}_{}.npy".format(modality_name, name),
                     )
-                ) as f:
-                    output["aerial"] = split_image(
-                        torch.FloatTensor(f.read()), self.nb_split, part
-                    )
-            elif modality == "s1-median":
-                modality_name = "s1a"
-                images = split_image(
-                    torch.from_numpy(
-                        np.load(
-                            os.path.join(
-                                self.root_path,
-                                "DATA_{}".format(modality_name.upper()),
-                                "{}_{}.npy".format(modality_name.upper(), name),
-                            )
-                        )
-                    ),
-                    self.nb_split,
-                    part,
-                ).to(torch.float32)
-                out, _ = torch.median(images, dim=0)
-                output[modality] = out
-            elif modality == "s2-median":
-                modality_name = "s2"
-                images = split_image(
-                    torch.from_numpy(
-                        np.load(
-                            os.path.join(
-                                self.root_path,
-                                "DATA_{}".format(modality_name.upper()),
-                                "{}_{}.npy".format(modality_name.upper(), name),
-                            )
-                        )
-                    ),
-                    self.nb_split,
-                    part,
-                ).to(torch.float32)
-                out, _ = torch.median(images, dim=0)
-                output[modality] = out
-            elif modality == "s1-4season-median":
-                modality_name = "s1a"
-                images = split_image(
-                    torch.from_numpy(
-                        np.load(
-                            os.path.join(
-                                self.root_path,
-                                "DATA_{}".format(modality_name.upper()),
-                                "{}_{}.npy".format(modality_name.upper(), name),
-                            )
-                        )
-                    ),
-                    self.nb_split,
-                    part,
-                ).to(torch.float32)
-                dates = prepare_dates(
-                    line["-".join(["dates", modality_name.upper()])],
-                    self.reference_date,
-                )
-                l = []
-                for i in range(4):
-                    mask = (dates >= 92 * i) & (dates < 92 * (i + 1))
-                    if sum(mask) > 0:
-                        r, _ = torch.median(images[mask], dim=0)
-                        l.append(r)
-                    else:
-                        l.append(
-                            torch.zeros(
-                                (images.shape[1], images.shape[-2], images.shape[-1])
-                            )
-                        )
-                output[modality] = torch.cat(l)
-            elif modality == "s2-4season-median":
-                modality_name = "s2"
-                images = split_image(
-                    torch.from_numpy(
-                        np.load(
-                            os.path.join(
-                                self.root_path,
-                                "DATA_{}".format(modality_name.upper()),
-                                "{}_{}.npy".format(modality_name.upper(), name),
-                            )
-                        )
-                    ),
-                    self.nb_split,
-                    part,
-                ).to(torch.float32)
-                dates = prepare_dates(
-                    line["-".join(["dates", modality_name.upper()])],
-                    self.reference_date,
-                )
-                l = []
-                for i in range(4):
-                    mask = (dates >= 92 * i) & (dates < 92 * (i + 1))
-                    if sum(mask) > 0:
-                        r, _ = torch.median(images[mask], dim=0)
-                        l.append(r)
-                    else:
-                        l.append(
-                            torch.zeros(
-                                (images.shape[1], images.shape[-2], images.shape[-1])
-                            )
-                        )
-                output[modality] = torch.cat(l)
-            else:
-                if len(modality) > 3:
-                    modality_name = modality[:2] + modality[3]
-                    output[modality] = split_image(
-                        torch.from_numpy(
-                            np.load(
-                                os.path.join(
-                                    self.root_path,
-                                    "DATA_{}".format(modality_name.upper()),
-                                    "{}_{}.npy".format(modality_name.upper(), name),
-                                )
-                            )
-                        ),
-                        self.nb_split,
-                        part,
-                    )
-                    output["_".join([modality, "dates"])] = prepare_dates(
-                        line["-".join(["dates", modality_name.upper()])],
-                        self.reference_date,
-                    )
-                else:
-                    output[modality] = split_image(
-                        torch.from_numpy(
-                            np.load(
-                                os.path.join(
-                                    self.root_path,
-                                    "DATA_{}".format(modality.upper()),
-                                    "{}_{}.npy".format(modality.upper(), name),
-                                )
-                            )
-                        ),
-                        self.nb_split,
-                        part,
-                    )
-                    output["_".join([modality, "dates"])] = prepare_dates(
-                        line["-".join(["dates", modality.upper()])], self.reference_date
-                    )
-                N = len(output[modality])
-                if N > 50:
-                    random_indices = torch.randperm(N)[:50]
-                    output[modality] = output[modality][random_indices]
-                    output["_".join([modality, "dates"])] = output[
-                        "_".join([modality, "dates"])
-                    ][random_indices]
+                ).astype(torch.float32)
+        }
+        data = {s: torch.from_numpy(a) for s, a in data.items()}
 
-        optical_ts = rearrange(output["s2"], "t c h w -> c t h w")
-        sar_ts = rearrange(output["s1-asc"], "t c h w -> c t h w")
+        dates = {
+                s: torch.from_numpy(self.get_dates(id_patch, s)) for s in self.sats
+            }
+        # output[modality_name] = images
+        # optical_ts = rearrange(output["s2"], "t c h w -> c t h w")
+
+
+        
 
         if self.multi_temporal == 1:
             # we only take the last frame
             optical_ts = optical_ts[:, -1]
-            sar_ts = sar_ts[:, -1]
-        else:
-            # select evenly spaced samples
-            optical_indexes = torch.linspace(
-                0, optical_ts.shape[1] - 1, self.multi_temporal, dtype=torch.long
-            )
-            sar_indexes = torch.linspace(
-                0, sar_ts.shape[1] - 1, self.multi_temporal, dtype=torch.long
-            )
-
-            optical_ts = optical_ts[:, optical_indexes]
-            sar_ts = sar_ts[:, sar_indexes]
+        
 
         return {
             "image": {
                 "optical": optical_ts.to(torch.float32),
-                "sar": sar_ts.to(torch.float32),
             },
-            "target": output["label"].to(torch.int64),
-            "metadata": {},
+            "target": target.to(torch.int64),
+            "dates": {},
         }
 
-    def __len__(self) -> int:
-        """Return the length of the dataset.
+    # def __len__(self) -> int:
+    #     """Return the length of the dataset.
 
-        Returns:
-            int: length of the dataset.
-        """
-        return len(self.meta_patch) * self.nb_split * self.nb_split
+    #     Returns:
+    #         int: length of the dataset.
+    #     """
+    #     return len(self.meta_patch) * self.nb_split * self.nb_split
 
     @staticmethod
     def download():
