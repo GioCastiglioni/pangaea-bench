@@ -267,8 +267,6 @@ class Dummy(RawGeoFMDataset):
         dates = {
                 s: self.get_dates(id_patch, s) for s in self.modalities
             }
-        # output[modality_name] = images
-        # optical_ts = rearrange(output["s2"], "t c h w -> c t h w")
 
 
         

@@ -1,6 +1,6 @@
-_target_: pangaea.datasets.pastis.Pastis
-dataset_name: Pastis
-root_path: /mnt/ialabnas2/datasets/pangaea-bench/PASTIS-HD
+_target_: pangaea.datasets.dummy.Dummy
+dataset_name: Dummy
+root_path: 
 download_url: null
 auto_download: False
 
@@ -10,53 +10,50 @@ multi_modal: True
 #limited_label: False
 
 # classes
-ignore_index: 19
-num_classes: 20
-classes: 
-  - Background
-  - Meadow
-  - Soft Winter Wheat
-  - Corn
-  - Winter Barley
-  - Winter Rapeseed
-  - Spring Barley
-  - Sunflower
-  - Grapevine
-  - Beet
-  - Winter Triticale
-  - Winter Durum Wheat
-  - Fruits, Vegetables, Flowers
-  - Potatoes
-  - Leguminous Fodder
-  - Soybeans
-  - Orchard
-  - Mixed Cereal
-  - Sorghum
-  - Void Label
+ignore_index: 0
+num_classes: 11
+# array({'TOMATE': 1, 'CEBOLLA': 2, 'PAPA': 3, 'MELON': 4, 'SANDÍA': 5, 'ZAPALLO': 6, 'POROTO': 7, 'CHOCLO': 8, 'LECHUGA': 9, 'FRUTILLA': 10},
+
+classes:
+  - VOID
+  - TOMATE
+  - CEBOLLA
+  - PAPA
+  - MELON
+  - SANDIA
+  - ZAPALLO
+  - POROTO
+  - CHOCLO
+  - LECHUGA
+  - FRUTILLA
+
+# {0: np.float64(0.9220673292190457),
+#  1: np.float64(0.03240371130711003),
+#  2: np.float64(0.010029104149770209),
+#  3: np.float64(0.0037840146830224386),
+#  4: np.float64(0.004179761422005947),
+#  5: np.float64(0.0033386345971884294),
+#  6: np.float64(0.011302014691470668),
+#  7: np.float64(0.005698066622735875),
+#  8: np.float64(0.00650500451980265),
+#  9: np.float64(0.0006840425621789673),
+#  10: np.float64(8.316225669099757e-06)}
 distribution:
-  - 0.00000
-  - 0.25675
-  - 0.06733
-  - 0.10767
-  - 0.02269
-  - 0.01451
-  - 0.00745
-  - 0.01111
-  - 0.08730
-  - 0.00715
-  - 0.00991
-  - 0.01398
-  - 0.02149
-  - 0.00452
-  - 0.02604
-  - 0.00994
-  - 0.02460
-  - 0.00696
-  - 0.00580
-  - 0.29476
+  - 0.92206
+  - 0.03240
+  - 0.01002
+  - 0.00378
+  - 0.00418
+  - 0.00334
+  - 0.01130
+  - 0.00570
+  - 0.00651
+  - 0.00068
+  - 0.00001
 
 bands:
   optical:
+    - B1
     - B2
     - B3
     - B4
@@ -65,47 +62,54 @@ bands:
     - B7
     - B8
     - B8A
+    - B9
     - B11
     - B12
-  sar:
-    - VV
-    - VH
-    - VV-VH 
+
+# Band 0: {'mean': np.float64(3788.9907424220155), 'std': np.float64(2761.6122969329726), 'min': np.uint16(0), 'max': np.uint16(17110)}
+# Band 1: {'mean': np.float64(3833.241778476073), 'std': np.float64(2730.580366418049), 'min': np.uint16(0), 'max': np.uint16(20720)}
+# Band 2: {'mean': np.float64(3845.4550742152496), 'std': np.float64(2529.290550742185), 'min': np.uint16(0), 'max': np.uint16(19392)}
+# Band 3: {'mean': np.float64(3821.74182047001), 'std': np.float64(2473.7931549584023), 'min': np.uint16(0), 'max': np.uint16(18384)}
+# Band 4: {'mean': np.float64(4088.3488695956535), 'std': np.float64(2393.550489518335), 'min': np.uint16(0), 'max': np.uint16(17775)}
+# Band 5: {'mean': np.float64(4545.829995365703), 'std': np.float64(2117.9953454093543), 'min': np.uint16(0), 'max': np.uint16(17582)}
+# Band 6: {'mean': np.float64(4710.742139767445), 'std': np.float64(2051.688226367314), 'min': np.uint16(0), 'max': np.uint16(17420)}
+# Band 7: {'mean': np.float64(4777.324978431619), 'std': np.float64(1965.7809699534714), 'min': np.uint16(0), 'max': np.uint16(17181)}
+# Band 8: {'mean': np.float64(4913.639814236111), 'std': np.float64(2157.3861841086755), 'min': np.uint16(0), 'max': np.uint16(17265)}
+# Band 9: {'mean': np.float64(5859.619226201976), 'std': np.float64(3316.380649865551), 'min': np.uint16(0), 'max': np.uint16(16804)}
+# Band 10: {'mean': np.float64(3485.567513549367), 'std': np.float64(1284.9204901161797), 'min': np.uint16(0), 'max': np.uint16(16106)}
+# Band 11: {'mean': np.float64(3044.01197125966), 'std': np.float64(1201.9166645597616), 'min': np.uint16(0), 'max': np.uint16(16182)}
 data_mean:
   optical:
-  - 1161.6764
-  - 1371.4307
-  - 1423.4067
-  - 1759.7251
-  - 2714.5259
-  - 3055.8376
-  - 3197.8960
-  - 3313.3577
-  - 2415.9675
-  - 1626.8431
-  sar:
-  - -10.9433
-  - -17.3600
-  - 6.4167
+  - 3788.9907
+  - 3833.2418
+  - 3845.4551
+  - 3821.7418
+  - 4088.3489
+  - 4545.8299
+  - 4710.7421
+  - 4777.3250
+  - 4913.6398
+  - 5859.6192
+  - 3485.5675
+  - 3044.0120
+
 data_std:
   optical:
-  - 2045.0698
-  - 1983.1763
-  - 2060.7969
-  - 1968.8173
-  - 1867.2159
-  - 1885.1361
-  - 1897.5105
-  - 1885.1636
-  - 1542.7665
-  - 1375.2511
-  sar:
-  - 3.3847
-  - 3.3727
-  - 3.3874 
+  - 2761.6123
+  - 2730.5804
+  - 2529.2906
+  - 2473.7932
+  - 2393.5505
+  - 2117.9953
+  - 2051.6882
+  - 1965.7810
+  - 2157.3862
+  - 3316.3806
+  - 1284.9205
+  - 1201.9167
+
+
 data_min:
-  optical: [-10000., -10000., -10000., -10000., -10000., -10000., -10000., -10000., -10000., -10000.]
-  sar: [-39.5312, -43.1250, -20.6562]
+  optical: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 data_max:
-  optical: [22256., 21891., 22626., 21814., 20134., 19282., 18957., 18482., 16935., 14668.] 
-  sar: [34.8750, 27.3125, 51.9062]
+  optical: [17110, 20720, 19392, 18384, 17775, 17582, 17420, 17181, 17265, 16804, 16106, 16182]
