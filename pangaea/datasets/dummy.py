@@ -269,7 +269,7 @@ class Dummy(RawGeoFMDataset):
             }
 
         # change the temporal axis
-        data = {s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()}
+        # data = {s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()}
 
         if self.multi_temporal == 1:
             # we only take the last frame
