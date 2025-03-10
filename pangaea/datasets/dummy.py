@@ -249,7 +249,7 @@ class Dummy(RawGeoFMDataset):
         target = torch.from_numpy(
             np.load(
                 os.path.join(self.root_path, "ANNOTATIONS/TARGET_" + str(name) + ".npy")
-            ).astype(np.int32)
+            )
         )
         # only for s2
         modality_name = "S2"
@@ -260,7 +260,7 @@ class Dummy(RawGeoFMDataset):
                         "DATA_{}".format(modality_name),
                         "{}_{}.npy".format(modality_name, name),
                     )
-                ).astype(np.float32)
+                )
         }
         data = {s: torch.from_numpy(a) for s, a in data.items()}
 
