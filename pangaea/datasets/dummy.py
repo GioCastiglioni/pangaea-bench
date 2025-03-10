@@ -268,8 +268,8 @@ class Dummy(RawGeoFMDataset):
                 s: self.get_dates(id_patch, s) for s in self.modalities
             }
 
-
-        
+        # change the temporal axis
+        data = {s: rearrange(a, "t c h w -> c t h w") for s, a in data.items()}
 
         if self.multi_temporal == 1:
             # we only take the last frame
