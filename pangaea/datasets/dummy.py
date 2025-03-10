@@ -269,7 +269,7 @@ class Dummy(RawGeoFMDataset):
             }
 
         # change the temporal axis
-        data = {s: rearrange(a, "t c h w -> c t h w") for s, a in data.items()}
+        data = {s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()}
 
         if self.multi_temporal == 1:
             # we only take the last frame
@@ -277,9 +277,7 @@ class Dummy(RawGeoFMDataset):
         
 
         return {
-            "image": {
-                    "optical": {s: a.to(torch.float32) for s, a in data.items()},
-                    },
+            "image":{s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()},
 
             "target": target.to(torch.int64),
             "dates": {s: dates[s].to(torch.int32) for s in self.modalities},
