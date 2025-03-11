@@ -1,0 +1,21 @@
+trainer:
+  _target_: pangaea.engine.trainer.PreTrainer
+  # params overwritten in run
+  model: null
+  train_loader: null
+  optimizer: null
+  lr_scheduler: null
+  evaluator: null
+  exp_dir: null
+  device: null
+  criterion: null
+
+  # params to adapt
+  n_epochs: 80
+  precision: fp32
+  ckpt_interval: 1000
+  eval_interval: 1
+  log_interval: 23
+  use_wandb: ${use_wandb}
+
+

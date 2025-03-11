@@ -1,5 +1,6 @@
 import hashlib
 import os as os
+os.environ["HYDRA_FULL_ERROR"] = "1"
 import pathlib
 import pprint
 import time
@@ -97,7 +98,7 @@ def main(cfg: DictConfig) -> None:
 
             wandb_cfg = OmegaConf.to_container(cfg, resolve=True)
             wandb.init(
-                project="geofm-bench",
+                project="pangaea-pretrain",
                 name=exp_name,
                 config=wandb_cfg,
             )
@@ -139,24 +140,23 @@ def main(cfg: DictConfig) -> None:
         encoder.load_encoder_weights(logger)
         logger.info(f"Built {encoder.model_name} from checkpoint.")
     
-
     # prepare the decoder (segmentation/regression)
     decoder: Decoder = instantiate(
-        cfg.decoder,
-        encoder=encoder,
-    )
+            cfg.decoder,
+            encoder=encoder,
+        )
     decoder.to(device)
     decoder = torch.nn.parallel.DistributedDataParallel(
-        decoder,
-        device_ids=[local_rank],
-        output_device=local_rank,
-        find_unused_parameters=cfg.finetune,
-    )
-    logger.info(
-        "Built {} for with {} encoder.".format(
-            decoder.module.model_name, type(encoder).__name__
+            decoder,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            find_unused_parameters=cfg.finetune,
         )
-    )
+    logger.info(
+            "Built {} for with {} encoder.".format(
+                decoder.module.model_name, type(encoder).__name__
+            )
+        )
 
     def non_encoder_params(module):
         for name, param in module.named_parameters():
@@ -246,7 +246,7 @@ def main(cfg: DictConfig) -> None:
             persistent_workers=False,
             worker_init_fn=seed_worker,
             # generator=g,
-            drop_last=False,
+            drop_last=cfg.pretrain,
             collate_fn=collate_fn,
         )
 
@@ -265,15 +265,20 @@ def main(cfg: DictConfig) -> None:
             total_iters=len(train_loader) * cfg.task.trainer.n_epochs,
         )
         
-        val_evaluator: Evaluator = instantiate(
-            cfg.task.evaluator, val_loader=val_loader, exp_dir=exp_dir, device=device,
-            inference_mode=cfg.task.evaluator.inference_mode,
-            dataset_name=cfg.dataset.dataset_name
-        )
-        trainer: Trainer = instantiate(
+        if cfg.pretrain: val_evaluator = None
+        else: 
+            val_evaluator: Evaluator = instantiate(
+                cfg.task.evaluator, val_loader=val_loader, exp_dir=exp_dir, device=device,
+                inference_mode=cfg.task.evaluator.inference_mode,
+                dataset_name=cfg.dataset.dataset_name
+            )
+
+        if cfg.pretrain:
+            trainer: PreTrainer = instantiate(
             cfg.task.trainer,
             model=decoder,
             train_loader=train_loader,
+            val_loader=val_loader,
             lr_scheduler=lr_scheduler,
             optimizer=optimizer,
             criterion=criterion,
@@ -281,45 +286,57 @@ def main(cfg: DictConfig) -> None:
             exp_dir=exp_dir,
             device=device,
         )
+        else:
+            trainer: Trainer = instantiate(
+                cfg.task.trainer,
+                model=decoder,
+                train_loader=train_loader,
+                lr_scheduler=lr_scheduler,
+                optimizer=optimizer,
+                criterion=criterion,
+                evaluator=val_evaluator,
+                exp_dir=exp_dir,
+                device=device,
+            )
         # resume training if model_checkpoint is provided
         if cfg.ckpt_dir is not None:
             trainer.load_model(cfg.ckpt_dir)
 
         trainer.train()
 
-    # Evaluation
-    test_preprocessor = instantiate(
-        cfg.preprocessing.test,
-        dataset_cfg=cfg.dataset,
-        encoder_cfg=cfg.encoder,
-        _recursive_=False,
-    )
+    if not cfg.pretrain:
+        # Evaluation
+        test_preprocessor = instantiate(
+            cfg.preprocessing.test,
+            dataset_cfg=cfg.dataset,
+            encoder_cfg=cfg.encoder,
+            _recursive_=False,
+        )
+        # get datasets
+        raw_test_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="test")
+        test_dataset = GeoFMDataset(raw_test_dataset, test_preprocessor)
 
-    # get datasets
-    raw_test_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="test")
-    test_dataset = GeoFMDataset(raw_test_dataset, test_preprocessor)
+        test_loader = DataLoader(
+            test_dataset,
+            sampler=DistributedSampler(test_dataset),
+            batch_size=cfg.test_batch_size,
+            num_workers=cfg.test_num_workers,
+            pin_memory=True,
+            persistent_workers=False,
+            drop_last=False,
+            collate_fn=collate_fn,
+        )
+        test_evaluator: Evaluator = instantiate(
+            cfg.task.evaluator, val_loader=test_loader, exp_dir=exp_dir, device=device,
+            inference_mode= cfg.task.evaluator.inference_mode, #'sliding' if train_run else 'whole',
+            dataset_name=cfg.dataset.dataset_name
+        )
 
-    test_loader = DataLoader(
-        test_dataset,
-        sampler=DistributedSampler(test_dataset),
-        batch_size=cfg.test_batch_size,
-        num_workers=cfg.test_num_workers,
-        pin_memory=True,
-        persistent_workers=False,
-        drop_last=False,
-        collate_fn=collate_fn,
-    )
-    test_evaluator: Evaluator = instantiate(
-        cfg.task.evaluator, val_loader=test_loader, exp_dir=exp_dir, device=device,
-        inference_mode= cfg.task.evaluator.inference_mode, #'sliding' if train_run else 'whole',
-        dataset_name=cfg.dataset.dataset_name
-    )
-
-    if cfg.use_final_ckpt:
-        model_ckpt_path = get_final_model_ckpt_path(exp_dir)
-    else:
-        model_ckpt_path = get_best_model_ckpt_path(exp_dir)
-    test_evaluator.evaluate(decoder, "test_model", model_ckpt_path)
+        if cfg.use_final_ckpt:
+            model_ckpt_path = get_final_model_ckpt_path(exp_dir)
+        else:
+            model_ckpt_path = get_best_model_ckpt_path(exp_dir)
+        test_evaluator.evaluate(decoder, "test_model", model_ckpt_path)
 
     if cfg.use_wandb and rank == 0:
         wandb.finish()

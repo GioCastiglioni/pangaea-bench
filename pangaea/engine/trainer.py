@@ -15,6 +15,23 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, Subset
 from pangaea.utils.logger import RunningAverageMeter, sec_to_hm
 
+class RandomChannelDropout(torch.nn.Module):
+    def __init__(self, p=0.5, num_drop=1):
+        """
+        Randomly drops 1 to `num_drop` channels with probability `p`
+        """
+        super().__init__()
+        self.p = p
+        self.num_drop = num_drop
+
+    def forward(self, x):
+        if torch.rand(1).item() < self.p:
+            # Select `num_drop` random channels
+            C = x.shape[1]  # Number of channels
+            drop_indices = torch.randperm(C)[:torch.randint(low=1, high=self.num_drop, size=(1,))]
+            x[:, drop_indices, :, :] = 0  # Set selected channels to zero
+        return x
+
 class AttentionProjectionHead(nn.Module):
     def __init__(self, in_channels, projection_dim=128, hidden_dim=256):
         super().__init__()
@@ -39,6 +56,7 @@ class PreTrainer:
         self,
         model: nn.Module,
         train_loader: DataLoader,
+        val_loader: DataLoader,
         criterion: nn.Module,
         optimizer: Optimizer,
         lr_scheduler: LRScheduler,
@@ -51,17 +69,15 @@ class PreTrainer:
         ckpt_interval: int,
         eval_interval: int,
         log_interval: int,
-        best_metric_key: str,
     ):
         """Initialize the Trainer.
 
         Args:
-            model (nn.Module): model to train (encoder + decoder).
+            model (nn.Module): model to train (encoder).
             train_loader (DataLoader): train data loader.
             criterion (nn.Module): criterion to compute the loss.
             optimizer (Optimizer): optimizer to update the model's parameters.
             lr_scheduler (LRScheduler): lr scheduler to update the learning rate.
-            evaluator (torch.nn.Module): task evaluator to evaluate the model.
             n_epochs (int): number of epochs to train the model.
             exp_dir (pathlib.Path | str): path to the experiment directory.
             device (torch.device): model
@@ -70,13 +86,13 @@ class PreTrainer:
             ckpt_interval (int): interval to save the checkpoint.
             eval_interval (int): interval to evaluate the model.
             log_interval (int): interval to log the training information.
-            best_metric_key (str): metric that determines best checkpoints.
         """
         self.rank = int(os.environ["RANK"])
         self.criterion = criterion
         self.model = model
-        self.projector = AttentionProjectionHead(model.module.channels)
+        self.projector = AttentionProjectionHead(model.module.in_channels[-1]).to("cuda")
         self.train_loader = train_loader
+        self.val_loader = val_loader
         self.batch_per_epoch = len(self.train_loader)
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
@@ -89,14 +105,13 @@ class PreTrainer:
         self.ckpt_interval = ckpt_interval
         self.eval_interval = eval_interval
         self.log_interval = log_interval
-        self.best_metric_key = best_metric_key
 
         self.training_stats = {
             name: RunningAverageMeter(length=self.batch_per_epoch)
             for name in ["loss", "data_time", "batch_time", "eval_time"]
         }
-        self.training_metrics = {}
-        self.best_metric_comp = operator.gt
+        self.best_metric = float("inf")
+        self.best_metric_comp = operator.lt
         self.num_classes = self.train_loader.dataset.num_classes
 
         assert precision in [
@@ -116,40 +131,85 @@ class PreTrainer:
 
             self.wandb = wandb
 
+    @torch.no_grad()
+    def evaluate(self):
+
+        print("\n-------------VALIDATION--------------")
+        
+        self.model.eval()
+        self.projector.eval()
+
+        end_time=time.time()
+        total_loss = 0
+        total_inv = 0
+        total_cov = 0
+        total_var = 0
+        for batch_idx, data in enumerate(self.val_loader):
+            image = data["image"]
+            image = {modality: value.to(self.device) for modality, value in image.items()}
+
+            with torch.autocast("cuda", enabled=self.enable_mixed_precision, dtype=self.precision):
+                image = self.projector(self.model.module.forward_pretraining(image))
+                loss, loss_var, loss_inv, loss_cov = self.compute_loss(image, image, each_comp=True)
+                total_loss += loss
+                total_inv += loss_inv
+                total_var += loss_var
+                total_cov += loss_cov
+
+        total_loss = (total_loss/(batch_idx + 1)).item()
+        total_inv = (total_inv/(batch_idx + 1)).item()
+        total_cov = (total_cov/(batch_idx + 1)).item()
+        total_var = (total_var/(batch_idx + 1)).item()
+        
+        used_time = time.time() - end_time
+        print(f"Val Loss: {np.round(total_loss, 3)}    |   Validation Time: {np.round(used_time, 2)} seconds.\n")
+        return [total_loss, total_var, total_inv, total_cov], used_time
+
     def train(self) -> None:
         """Train the model for n_epochs then evaluate the model and save the best model."""
+        transform = T.Compose([T.RandomRotation(degrees=45),
+                               T.RandomHorizontalFlip(p=0.7),
+                               T.RandomVerticalFlip(p=0.7),
+                               RandomChannelDropout(p=0.7, num_drop=6),
+                               ])
+
         # end_time = time.time()
         for epoch in range(self.start_epoch, self.n_epochs):
             # train the network for one epoch
             if epoch % self.eval_interval == 0:
-                metrics, used_time = self.evaluator(self.model, f"epoch {epoch}")
+                eval_loss, used_time = self.evaluate()
                 self.training_stats["eval_time"].update(used_time)
-                self.save_best_checkpoint(metrics, epoch)
-                del metrics
-                del used_time
+                self.save_best_checkpoint(eval_loss[0], epoch) 
+
+                if self.use_wandb and self.rank == 0:
+                    self.wandb.log(
+                        {
+                            "val/total_loss": eval_loss[0],
+                            "val/variance": eval_loss[1],
+                            "val/invariance": eval_loss[2],
+                            "val/covariance": eval_loss[3],
+                            "epoch": epoch
+                        },
+                        step=epoch * len(self.train_loader)
+                    )
                 torch.cuda.empty_cache()
 
             self.logger.info("============ Starting epoch %i ... ============" % epoch)
             # set sampler
             self.t = time.time()
             self.train_loader.sampler.set_epoch(epoch)
-            self.train_one_epoch(epoch)
+            self.train_one_epoch(epoch, transform)
             if epoch % self.ckpt_interval == 0 and epoch != self.start_epoch:
                 self.save_model(epoch)
             torch.cuda.empty_cache()
 
-        metrics, used_time = self.evaluator(self.model, "final model")
+        eval_loss, used_time = self.evaluate()
         self.training_stats["eval_time"].update(used_time)
-        self.save_best_checkpoint(metrics, self.n_epochs)
+        self.save_best_checkpoint(eval_loss, self.n_epochs)
 
-        del metrics
-        del used_time
         torch.cuda.empty_cache()
 
-        # save last model
-        # self.save_model(self.n_epochs, is_final=True)
-
-    def train_one_epoch(self, epoch: int) -> None:
+    def train_one_epoch(self, epoch: int, transform: nn.Module) -> None:
         """Train model for one epoch.
 
         Args:
@@ -158,35 +218,29 @@ class PreTrainer:
         self.model.train()
         self.projector.train()
 
-        for _, data in enumerate(self.train_loader):
-            data = {modality: value.to(self.device) for modality, value in data["image"].items()}
-            batch_size, _, _, _, input_size = data["optical"].shape
-            break
-
-        transform = T.Compose([T.RandomRotation(degrees=30),
-                               T.RandomHorizontalFlip(p=0.5),  # Applies the same flip to bothT.RandomApply(
-                               T.RandomApply(torch.nn.ModuleList([T.RandomCrop(size=(input_size//2, input_size//2)),
-                                                                  T.Resize(size=(input_size, input_size))]), p=0.5),
-                               ])
-
         end_time = time.time()
         for batch_idx, data in enumerate(self.train_loader):
             image = data["image"]
-            
-            image = {modality: transform(torch.cat((value,value), dim=0).to(self.device)) for modality, value in image.items()}
-            image2 = {modality: value[batch_size:] for modality, value in image.items()}
-            image = {modality: value[:batch_size] for modality, value in image.items()}
+            image1, image2 = {}, {}
+
+            for modality, value in image.items():
+                value = value.to(self.device)
+                B, C, T, H, W = value.shape
+
+                value = value.permute(0, 2, 1, 3, 4).reshape(B*T, C, H, W)
+
+                image1[modality] = transform(value).view(B,T,C,H,W).permute(0, 2, 1, 3, 4)
+                image2[modality] = transform(value).view(B,T,C,H,W).permute(0, 2, 1, 3, 4)
 
             self.training_stats["data_time"].update(time.time() - end_time)
 
             with torch.autocast(
                 "cuda", enabled=self.enable_mixed_precision, dtype=self.precision
             ):
-                logits_1 = self.projector(self.model.forward_pretraining(image, output_shape=image.shape[-2:]))
-                logits_2 = self.projector(self.model.forward_pretraining(image2, output_shape=image2.shape[-2:]))
+                image1 = self.projector(self.model.module.forward_pretraining(image1))
+                image2 = self.projector(self.model.module.forward_pretraining(image2))
 
-                loss = self.compute_loss(logits_1, logits_2)
-                #TODO IMPLEMENTAR PRETRAINING DE DOS BATCHES
+                loss, var, inv, cov = self.compute_loss(image1, image2, each_comp=True)
 
             self.optimizer.zero_grad()
 
@@ -199,8 +253,6 @@ class PreTrainer:
             self.scaler.step(self.optimizer)
             self.scaler.update()
             self.training_stats['loss'].update(loss.item())
-            with torch.no_grad():
-                self.compute_logging_metrics(logits, target)
             if (batch_idx + 1) % self.log_interval == 0:
                 self.log(batch_idx + 1, epoch)
 
@@ -209,13 +261,11 @@ class PreTrainer:
             if self.use_wandb and self.rank == 0:
                 self.wandb.log(
                     {
-                        "train_loss": loss.item(),
-                        "learning_rate": self.optimizer.param_groups[0]["lr"],
-                        "epoch": epoch,
-                        **{
-                            f"train_{k}": v.avg
-                            for k, v in self.training_metrics.items()
-                        },
+                        "train/train_loss": loss.item(),
+                        "train/variance": var,
+                        "train/invariance": inv,
+                        "train/covariance": cov,
+                        "learning_rate": self.lr_scheduler.get_last_lr()[0] if self.lr_scheduler is not None else self.optimizer.param_groups[0]["lr"],
                     },
                     step=epoch * len(self.train_loader) + batch_idx,
                 )
@@ -233,7 +283,8 @@ class PreTrainer:
             dict[str, dict | int]: checkpoint dictionary.
         """
         checkpoint = {
-            "model": self.model.module.state_dict(),
+            "encoder": self.model.module.encoder.state_dict(), #only save encoder
+            "ltae_tmap": self.model.module.tmap.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "lr_scheduler": self.lr_scheduler.state_dict(),
             "scaler": self.scaler.state_dict(),
@@ -290,23 +341,21 @@ class PreTrainer:
             f"Loaded model from {resume_path}. Resume training from epoch {self.start_epoch}"
         )
 
-    def compute_loss(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def compute_loss(self, logits1: torch.Tensor, logits2: torch.Tensor, each_comp: bool = False) -> torch.Tensor:
         """Compute the loss.
 
         Args:
-            logits (torch.Tensor): logits from the model.
-            target (torch.Tensor): target tensor.
-
-        Raises:
-            NotImplementedError: raise if the method is not implemented.
+            logits1 (torch.Tensor): logits from a view
+            logits2 (torch.Tensor): logits from another view.
 
         Returns:
             torch.Tensor: loss value.
         """
-        raise NotImplementedError
+
+        return self.criterion(logits1, logits2, each_comp=each_comp)
 
     def save_best_checkpoint(
-        self, eval_metrics: dict[float, list[float]], epoch: int
+        self, eval_metrics: float, epoch: int
     ) -> None:
         """Update the best checkpoint according to the evaluation metrics.
 
@@ -314,9 +363,9 @@ class PreTrainer:
             eval_metrics (dict[float, list[float]]): metrics computed by the evaluator on the validation set.
             epoch (int): number of the epoch.
         """
-        curr_metric = eval_metrics[self.best_metric_key]
+        curr_metric = eval_metrics
         if isinstance(curr_metric, list):
-            curr_metric = curr_metric[0] if self.num_classes == 1 else np.mean(curr_metric)
+            curr_metric = curr_metric[0]
         if self.best_metric_comp(curr_metric, self.best_metric):
             self.best_metric = curr_metric
             best_ckpt = self.get_checkpoint(epoch)
@@ -340,7 +389,7 @@ class PreTrainer:
         Returns:
             dict[float, list[float]]: logging metrics.
         """
-        raise NotImplementedError
+        pass
 
     def log(self, batch_idx: int, epoch) -> None:
         """Log the information.
@@ -382,14 +431,7 @@ class PreTrainer:
             )
         )
 
-        metrics_info = [
-            "{} {:>7} ({:>7})".format(k, "%.3f" % v.val, "%.3f" % v.avg)
-            for k, v in self.training_metrics.items()
-        ]
-        metrics_info = "\n Training metrics: " + "\t".join(metrics_info)
-        # extra_metrics_info = self.extra_info_template.format(**self.extra_info)
-        log_info = basic_info + metrics_info
-        self.logger.info(log_info)
+        self.logger.info(basic_info)
 
     def reset_stats(self) -> None:
         """Reset the training stats and metrics."""
@@ -506,7 +548,7 @@ class Trainer:
         self.save_best_checkpoint(metrics, self.n_epochs)
 
         # save last model
-        self.save_model(self.n_epochs, is_final=True)
+        #self.save_model(self.n_epochs, is_final=True)
 
         del metrics
         del used_time
