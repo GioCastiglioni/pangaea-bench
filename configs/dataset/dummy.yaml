@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.dummy.Dummy
 dataset_name: Dummy
-root_path: /home/nisla/storage/datasets/dummy/fix
+root_path: /home/nisla/datasets/fix
 download_url: None
 auto_download: False
 
