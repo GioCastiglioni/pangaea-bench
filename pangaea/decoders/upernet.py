@@ -251,15 +251,13 @@ class SegUPerNet(Decoder):
 
 
     def forward_pretraining(
-        self, img: dict[str, torch.Tensor], output_shape: torch.Size | None = None
-    ) -> torch.Tensor:
+        self, img: dict[str, torch.Tensor]) -> torch.Tensor:
         """Compute the pretraining output.
 
         Args:
             img (dict[str, torch.Tensor]): input data structured as a dictionary:
             img = {modality1: tensor1, modality2: tensor2, ...}, e.g. img = {"optical": tensor1, "sar": tensor2}.
             with tensor1 and tensor2 of shape (B C T=1 H W) with C the number of encoders'bands for the given modality.
-            output_shape (torch.Size | None, optional): output's spatial dims (H, W) (equals to the target spatial dims).
             Defaults to None.
 
         Returns:
@@ -425,6 +423,55 @@ class SegMTUPerNet(SegUPerNet):
         output = F.interpolate(output, size=output_shape, mode="bilinear")
 
         return output
+    
+    def forward_pretraining(
+        self, img: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Compute the segmentation output for multi-temporal data.
+
+        Args:
+            img (dict[str, torch.Tensor]): input data structured as a dictionary:
+            img = {modality1: tensor1, modality2: tensor2, ...}, e.g. img = {"optical": tensor1, "sar": tensor2}.
+            with tensor1 and tensor2 of shape (B C T H W) with C the number of encoders'bands for the given modality,
+            and T the number of time steps.
+            Defaults to None.
+
+        Returns:
+            torch.Tensor: output tensor of shape (B, num_classes, H', W') with (H' W') coressponding to the output_shape.
+        """
+        # If the encoder handles multi_temporal we feed it with the input
+        if self.encoder.multi_temporal:
+            if not self.finetune:
+                with torch.no_grad():
+                    feats = self.encoder(img)
+            else:
+                feats = self.encoder(img)
+            # multi_temporal models can return either (B C' T H' W')
+            # or (B C' H' W') via internal merging strategy
+
+        # If the encoder handles only single temporal data, we apply multi_temporal_strategy
+        else:
+            feats = []
+            for i in range(self.multi_temporal):
+                if not self.finetune:
+                    with torch.no_grad():
+                        feats.append(
+                            self.encoder({k: v[:, :, i, :, :] for k, v in img.items()})
+                        )
+                else:
+                    feats.append(
+                        self.encoder({k: v[:, :, i, :, :] for k, v in img.items()})
+                    )
+
+            feats = [list(i) for i in zip(*feats)]
+            # obtain features per layer
+            feats = [torch.stack(feat_layers, dim=2) for feat_layers in feats]
+
+        if self.tmap is not None:
+            if self.multi_temporal_strategy == "ltae":
+                feats = self.ltae_adaptor(feats)
+                feats = self.tmap(feats[-1])
+
+        return feats
 
 
 class SiamUPerNet(SegUPerNet):
