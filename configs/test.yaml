@@ -1,4 +1,5 @@
 train: false
+pretrain: false
 work_dir: ""
 seed: 234
 use_wandb: false
