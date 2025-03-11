@@ -98,7 +98,7 @@ def main(cfg: DictConfig) -> None:
 
             wandb_cfg = OmegaConf.to_container(cfg, resolve=True)
             wandb.init(
-                project="pangaea-pretrain",
+                project=cfg.wandb_project,
                 name=exp_name,
                 config=wandb_cfg,
             )

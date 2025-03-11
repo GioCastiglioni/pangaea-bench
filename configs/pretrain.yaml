@@ -4,6 +4,7 @@ work_dir: ""
 seed: 234
 use_wandb: false
 wandb_run_id: null
+wandb_project: ""
 
 # TRAINING
 num_workers: 4
