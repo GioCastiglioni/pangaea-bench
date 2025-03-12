@@ -178,7 +178,7 @@ class Dummy(RawGeoFMDataset):
         reference_date = "2017-06-01"
         self.reference_date = datetime(*map(int, reference_date.split("-")))
 
-        self.num_classes = 10
+        self.num_classes = 11
 
         print("Reading patch metadata . . .")
         self.meta_patch = gpd.read_file(os.path.join(root_path, "metadata.geojson"))
