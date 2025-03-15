@@ -225,15 +225,17 @@ class SegEvaluator(Evaluator):
         )
 
         for batch_idx, data in enumerate(tqdm(self.val_loader, desc=tag)):
-
             image, target = data["image"], data["target"]
             image = {k: v.to(self.device) for k, v in image.items()}
             target = target.to(self.device)
 
             if self.inference_mode == "sliding":
                 input_size = model.module.encoder.input_size
-                logits = self.sliding_inference(model, image, input_size, output_shape=target.shape[-2:],
-                                                max_batch=self.sliding_inference_batch)
+                if model.module.encoder.model_name != "utae_encoder":
+                    logits = self.sliding_inference(model, image, input_size, output_shape=target.shape[-2:],
+                                                    max_batch=self.sliding_inference_batch)
+                else: 
+                    logits = model(image, batch_positions=torch.tensor([  2,  42,  87, 127, 172, 212]).float().unsqueeze(0).expand(image["optical"].shape[0], -1))
             elif self.inference_mode == "whole":
                 input_size = model.module.encoder.input_size
                 for k, v in image.items():

@@ -573,7 +573,10 @@ class Trainer:
             with torch.autocast(
                 "cuda", enabled=self.enable_mixed_precision, dtype=self.precision
             ):
-                logits = self.model(image, output_shape=target.shape[-2:])
+                if self.model.module.encoder.model_name != "utae_encoder":
+                    logits = self.model(image, output_shape=target.shape[-2:])
+                else: 
+                    logits = self.model(image, batch_positions=torch.tensor([  2,  42,  87, 127, 172, 212]).float().unsqueeze(0).expand(image["optical"].shape[0], -1))
                 loss = self.compute_loss(logits, target)
 
             self.optimizer.zero_grad()
