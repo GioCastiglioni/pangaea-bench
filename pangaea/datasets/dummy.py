@@ -252,7 +252,7 @@ class Dummy(RawGeoFMDataset):
             )
         )
         # only for s2
-        modality_name = "S2"
+        modality_name = self.modalities[0]
         data = {
                 modality_name: np.load(
                     os.path.join(
@@ -267,8 +267,8 @@ class Dummy(RawGeoFMDataset):
 
         data = {"optical" if is_s2(s) else "": torch.from_numpy(a) for s, a in data.items()}
 
-        dates = {
-                "optical" if is_s2(s) else "": self.get_dates(id_patch, s) for s in self.modalities
+        metadata = {
+                "dates": self.get_dates(id_patch, s) for s in self.modalities
             }
 
         # change the temporal axis
@@ -278,14 +278,13 @@ class Dummy(RawGeoFMDataset):
             # we only take the last frame
             optical_ts = optical_ts[:, -1]
         
-
-        return {
+        return_dict = {
             "image":{s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()},
-
             "target": target.to(torch.int64),
-            "dates": {"optical" if is_s2(s) else "": dates["optical" if is_s2(s) else ""].to(torch.int32) for s in self.modalities},
+            "metadata": metadata["dates"].to(torch.int32),
         }
 
+        return return_dict
 
     @staticmethod
     def download():
