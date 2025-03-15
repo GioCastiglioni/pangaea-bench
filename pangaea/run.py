@@ -133,9 +133,14 @@ def main(cfg: DictConfig) -> None:
     logger.info(f"Device used: {device}")
 
     encoder: Encoder = instantiate(cfg.encoder)
-    if cfg.from_scratch and cfg.finetune and train_run:
+    if train_run:
+        if cfg.from_scratch and cfg.finetune:
             encoder.load_encoder_weights(logger, from_scratch=True)
             logger.info(f"Built {encoder.model_name} from scratch.")
+        elif cfg.from_pretraining:
+            checkpoint = torch.load("/home/gcastiglioni/storage/pangaea/20250310_141107_0c2606_ssl4eo_dino_seg_upernet_mt_ltae_croptypemapping/checkpoint__best.pth", weights_only=False)
+            encoder.load_state_dict(checkpoint["encoder"])
+            logger.info(f"Built {encoder.model_name} from pretraining.")
     else:
         encoder.load_encoder_weights(logger)
         logger.info(f"Built {encoder.model_name} from checkpoint.")
@@ -152,6 +157,11 @@ def main(cfg: DictConfig) -> None:
             output_device=local_rank,
             find_unused_parameters=cfg.finetune,
         )
+    if train_run and not cfg.from_scratch:
+        if cfg.from_pretraining:
+            decoder.module.tmap.load_state_dict(checkpoint["ltae_tmap"])
+            logger.info(f"Built LTAE from pretraining.")
+
     logger.info(
             "Built {} for with {} encoder.".format(
                 decoder.module.model_name, type(encoder).__name__
