@@ -6,29 +6,30 @@ import torch.nn.functional as F
 
 def get_collate_fn(modalities: list[str]) -> Callable:
     def collate_fn(
-        batch: dict[str, dict[str, torch.Tensor] | torch.Tensor],
+        batch: list[dict[str, dict[str, torch.Tensor] | torch.Tensor]],
     ) -> dict[str, dict[str, torch.Tensor] | torch.Tensor]:
         """Collate function for torch DataLoader
-        args:
-            batch: list of dictionaries with keys 'image' and 'target'.
-            'image' is a dictionary with keys corresponding to modalities and values being torch.Tensor
-            of shape (C, H, W) for single images, (C, T, H, W) where T is the temporal dimension for
-            time series data. 'target' is a torch.Tensor
-        returns:
-            dictionary with keys 'image' and 'target'
+        
+        Args:
+            batch: list of dictionaries with keys 'image', 'target', and optionally 'dates'.
+                   'image' is a dict with keys corresponding to modalities and values being torch.Tensor.
+                   For single images: shape (C, H, W), for time series: (C, T, H, W).
+                   'target' is a torch.Tensor.
+                   'dates' is a torch.Tensor if present.
+        Returns:
+            A dictionary with keys 'image', 'target', and 'dates' (if available).
         """
-        # compute the maximum temporal dimension
+        # Compute maximum temporal dimension across modalities for time series images
         T_max = 0
         for modality in modalities:
             for x in batch:
-                # check if the image is a time series, i.e. has 4 dimensions
+                # Check if the image is a time series (has 4 dimensions)
                 if len(x["image"][modality].shape) == 4:
                     T_max = max(T_max, x["image"][modality].shape[1])
-        # pad all images to the same temporal dimension
+                    
+        # Pad all images to the same temporal dimension if needed
         for modality in modalities:
             for i, x in enumerate(batch):
-                # check if the image is a time series, if yes then pad it
-                # else do nothing
                 if len(x["image"][modality].shape) == 4:
                     T = x["image"][modality].shape[1]
                     if T < T_max:
@@ -37,13 +38,20 @@ def get_collate_fn(modalities: list[str]) -> Callable:
                             x["image"][modality], padding, "constant", 0
                         )
 
-        # stack all images and targets
-        return {
+        # Build the batch dictionary for images and target
+        batch_out = {
             "image": {
                 modality: torch.stack([x["image"][modality] for x in batch])
                 for modality in modalities
             },
             "target": torch.stack([x["target"] for x in batch]),
         }
+        
+        # Conditionally add "metadata" if present in the first sample
+        if "metadata" in batch[0]:
+            batch_out["metadata"] = torch.stack([x["metadata"] for x in batch])
+        
+        return batch_out
 
     return collate_fn
+

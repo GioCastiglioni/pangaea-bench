@@ -235,50 +235,56 @@ class SegEvaluator(Evaluator):
                     logits = self.sliding_inference(model, image, input_size, output_shape=target.shape[-2:],
                                                     max_batch=self.sliding_inference_batch)
                 else: 
-                    logits = model(image, batch_positions=torch.tensor([  2,  42,  87, 127, 172, 212]).float().unsqueeze(0).expand(image["optical"].shape[0], -1))
+                    logits = model(image, batch_positions=data["metadata"])
             elif self.inference_mode == "whole":
-                input_size = model.module.encoder.input_size
-                for k, v in image.items():
-                    h, w = v.shape[-2:]
-                    image[k] = v[:,:,:,h//2 - input_size//2 : h//2 + input_size//2, w//2 - input_size//2 : w//2 + input_size//2]
-                target = target[:, h//2 - input_size//2 : h//2 + input_size//2, w//2 - input_size//2 : w//2 + input_size//2]
+                if model.module.encoder.model_name != "utae_encoder":
+                    logits = model(image, output_shape=target.shape[-2:])
+                else: 
+                    logits = model(image, batch_positions=data["metadata"])
                 
-                wrapper = MaskWrapper(model, target_category = 1)
-                logits, mask = wrapper(image, out_shape=target.shape[-2:])
+                #TODO: IMPLEMENT XAI USING EDITED PYTORCH GRAD CAM LIBRARY
+                # input_size = model.module.encoder.input_size
+                # for k, v in image.items():
+                #     h, w = v.shape[-2:]
+                #     image[k] = v[:,:,:,h//2 - input_size//2 : h//2 + input_size//2, w//2 - input_size//2 : w//2 + input_size//2]
+                # target = target[:, h//2 - input_size//2 : h//2 + input_size//2, w//2 - input_size//2 : w//2 + input_size//2]
+                
+                # wrapper = MaskWrapper(model, target_category = 1)
+                # logits, mask = wrapper(image, out_shape=target.shape[-2:])
 
-                with XAI(model=model.module,
-                # UNET model.module.encoder.encoder.down_seq.down4.mpconv[-1].conv[-3]
-                # CROMA model.module.encoder.s2_encoder.transformer.layers[-1].net[0]
-                target_layers=[model.module.encoder.encoder.down_seq.down4.mpconv[-1].conv[-3]],
-                #reshape_transform = self.reshape_transform
-                ) as cam:
-                    grayscale_cam = cam(input_tensor=image["optical"],
-                                        targets=[SemanticSegmentationTarget(1, mask)])[0,:]
+                # with XAI(model=model.module,
+                # # UNET model.module.encoder.encoder.down_seq.down4.mpconv[-1].conv[-3]
+                # # CROMA model.module.encoder.s2_encoder.transformer.layers[-1].net[0]
+                # target_layers=[model.module.encoder.encoder.down_seq.down4.mpconv[-1].conv[-3]],
+                # #reshape_transform = self.reshape_transform
+                # ) as cam:
+                #     grayscale_cam = cam(input_tensor=image["optical"],
+                #                         targets=[SemanticSegmentationTarget(1, mask)])[0,:]
                                         
-                    grayscale_cam = (255 * (grayscale_cam - grayscale_cam.min()) / (grayscale_cam.max() - grayscale_cam.min())).astype(np.uint8)
-                    heatmap = plt.get_cmap('turbo')(grayscale_cam)  
-                    heatmap = (heatmap[:, :, :3] * 255).astype(np.uint8)
+                #     grayscale_cam = (255 * (grayscale_cam - grayscale_cam.min()) / (grayscale_cam.max() - grayscale_cam.min())).astype(np.uint8)
+                #     heatmap = plt.get_cmap('turbo')(grayscale_cam)  
+                #     heatmap = (heatmap[:, :, :3] * 255).astype(np.uint8)
 
-                    input_img = image['optical'].squeeze(2).detach().cpu()
-                    input_img = input_img[0, :3].numpy() if self.dataset_name=='HLSBurnScars' else input_img[0,1:4].numpy()
-                    input_img = (255 * (input_img - input_img.min()) / (input_img.max() - input_img.min())).astype(np.uint8)
-                    red, green, blue = input_img[2], input_img[1], input_img[0]
-                    input_img = np.stack([red, green, blue], axis=-1)
+                #     input_img = image['optical'].squeeze(2).detach().cpu()
+                #     input_img = input_img[0, :3].numpy() if self.dataset_name=='HLSBurnScars' else input_img[0,1:4].numpy()
+                #     input_img = (255 * (input_img - input_img.min()) / (input_img.max() - input_img.min())).astype(np.uint8)
+                #     red, green, blue = input_img[2], input_img[1], input_img[0]
+                #     input_img = np.stack([red, green, blue], axis=-1)
 
-                    heatmap_resized = cv2.resize(heatmap, (input_img.shape[1], input_img.shape[0]))
+                #     heatmap_resized = cv2.resize(heatmap, (input_img.shape[1], input_img.shape[0]))
 
-                    w_mask=np.uint8(np.zeros((input_size,input_size,3)))
-                    w_mask[:,:,1] = np.uint8(255*target.detach().cpu()[0].numpy())
-                    w_mask[:,:,0] = np.uint8(255*mask)
+                #     w_mask=np.uint8(np.zeros((input_size,input_size,3)))
+                #     w_mask[:,:,1] = np.uint8(255*target.detach().cpu()[0].numpy())
+                #     w_mask[:,:,0] = np.uint8(255*mask)
 
-                    alpha = 0.25  # You can adjust the transparency
-                    blended_img = cv2.addWeighted(heatmap_resized, 0.7, w_mask, 0.3, 0)
-                    blended_img = cv2.addWeighted(input_img, 1 - alpha, blended_img, alpha, 0)
+                #     alpha = 0.25  # You can adjust the transparency
+                #     blended_img = cv2.addWeighted(heatmap_resized, 0.7, w_mask, 0.3, 0)
+                #     blended_img = cv2.addWeighted(input_img, 1 - alpha, blended_img, alpha, 0)
 
-                    cam_img = np.hstack((input_img, w_mask, heatmap_resized, blended_img))
+                #     cam_img = np.hstack((input_img, w_mask, heatmap_resized, blended_img))
 
-                    cam_img = Image.fromarray(cam_img)
-                    cam_img.save(f"/home/gcastiglioni/storage/cams/{self.dataset_name}/cam_img_{batch_idx}.jpg")
+                #     cam_img = Image.fromarray(cam_img)
+                #     cam_img.save(f"/home/gcastiglioni/storage/cams/{self.dataset_name}/cam_img_{batch_idx}.jpg")
                     
             else:
                 raise NotImplementedError((f"Inference mode {self.inference_mode} is not implemented."))

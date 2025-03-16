@@ -576,7 +576,7 @@ class Trainer:
                 if self.model.module.encoder.model_name != "utae_encoder":
                     logits = self.model(image, output_shape=target.shape[-2:])
                 else: 
-                    logits = self.model(image, batch_positions=torch.tensor([  2,  42,  87, 127, 172, 212]).float().unsqueeze(0).expand(image["optical"].shape[0], -1))
+                    logits = self.model(image, batch_positions=data["metadata"])
                 loss = self.compute_loss(logits, target)
 
             self.optimizer.zero_grad()
