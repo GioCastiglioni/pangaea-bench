@@ -396,21 +396,6 @@ class SegMTUPerNet(SegUPerNet):
             else: feats = self.encoder(img)
             feats = [feat.reshape(b,t,*feat.shape[1:]).permute(0,2,1,3,4) for feat in feats]
 
-            # feats = []
-            # for i in range(self.multi_temporal):
-            #     if not self.finetune:
-            #         with torch.no_grad():
-            #             feats.append(
-            #                 self.encoder({k: v[:, :, i, :, :] for k, v in img.items()})
-            #             )
-            #     else:
-            #         feats.append(
-            #             self.encoder({k: v[:, :, i, :, :] for k, v in img.items()})
-            #         )
-            # feats = [list(i) for i in zip(*feats)]
-            # # obtain features per layer
-            # feats = [torch.stack(feat_layers, dim=2) for feat_layers in feats]
-
         if self.tmap is not None:
             if self.multi_temporal_strategy == "ltae":
                 feats = self.ltae_adaptor(feats)
