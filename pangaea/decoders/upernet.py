@@ -388,8 +388,8 @@ class SegMTUPerNet(SegUPerNet):
 
         # If the encoder handles only single temporal data, we apply multi_temporal_strategy
         else:
-            b,c,t,h,w = img["optical"].shape
-            img = {k: v.permute(0,2,1,3,4).reshape(b*t,c,h,w) for k,v in img.items()}
+            sizes = {k: v.shape for k, v in img.items()}
+            img = {k: v.permute(0,2,1,3,4).reshape(sizes[k][0]*sizes[k][2],sizes[k][1],sizes[k][3],sizes[k][4]) for k,v in img.items()}
             if not self.finetune:
                 with torch.no_grad():
                     feats = self.encoder(img)
