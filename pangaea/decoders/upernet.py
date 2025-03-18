@@ -394,7 +394,7 @@ class SegMTUPerNet(SegUPerNet):
                 with torch.no_grad():
                     feats = self.encoder(img)
             else: feats = self.encoder(img)
-            feats = [feat.reshape(b,t,*feat.shape[1:]).permute(0,2,1,3,4) for feat in feats]
+            feats = [feat.reshape(sizes["optical"][0],sizes["optical"][2],*feat.shape[1:]).permute(0,2,1,3,4) for feat in feats]
 
         if self.tmap is not None:
             if self.multi_temporal_strategy == "ltae":
