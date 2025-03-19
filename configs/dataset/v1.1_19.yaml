@@ -1,0 +1,95 @@
+_target_: pangaea.datasets.dummy.Dummy
+dataset_name: Dummy
+root_path: /home/gcastiglioni/datasets/crops/v1.1_19/processed
+download_url: None
+auto_download: False
+
+img_size: 128
+multi_temporal: 19
+multi_modal: True
+#limited_label: False
+
+# classes
+ignore_index: 0
+num_classes: 11
+# array({'TOMATE': 1, 'CEBOLLA': 2, 'PAPA': 3, 'MELON': 4, 'SANDÍA': 5, 'ZAPALLO': 6, 'POROTO': 7, 'CHOCLO': 8, 'LECHUGA': 9, 'FRUTILLA': 10},
+
+classes:
+  - VOID
+  - TOMATE
+  - CEBOLLA
+  - PAPA
+  - MELON
+  - SANDIA
+  - ZAPALLO
+  - POROTO
+  - CHOCLO
+  - LECHUGA
+  - FRUTILLA
+
+distribution:
+  - 0.93480
+  - 0.02784
+  - 0.00751
+  - 0.00270
+  - 0.00590
+  - 0.00384
+  - 0.00898
+  - 0.00274
+  - 0.00459
+  - 0.00038
+  - 0.00072
+
+
+bands:
+  optical:
+    - B1
+    - B2
+    - B3
+    - B4
+    - B5
+    - B6
+    - B7
+    - B8
+    - B8A
+    - B9
+    - B11
+    - B12
+
+
+data_mean:
+  optical:
+  - 2722.1858
+  - 2656.3527
+  - 2722.2668
+  - 2733.2634
+  - 2975.2802
+  - 3330.8154
+  - 3457.0267
+  - 3534.8095
+  - 3603.154
+  - 4174.6296
+  - 2304.987
+  - 2051.4802
+
+data_std:
+  optical:
+  - 3333.0221
+  - 3165.8738
+  - 3062.2886
+  - 3018.6454
+  - 3082.0036
+  - 2970.7136
+  - 2936.0414
+  - 2893.5852
+  - 3073.3999
+  - 4219.6471
+  - 1595.3657
+  - 1517.9684
+
+
+
+data_min:
+  optical: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+data_max:
+  optical: [16336, 18736, 17792, 17504, 15415, 16140, 15340, 15728, 16768, 16030, 16182, 16193]
