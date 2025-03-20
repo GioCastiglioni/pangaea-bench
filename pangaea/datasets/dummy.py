@@ -116,6 +116,7 @@ class Dummy(RawGeoFMDataset):
         data_max: dict[str, list[str]],
         download_url: str,
         auto_download: bool,
+        reference_date: str = ""
     ):
         """Initialize the PASTIS dataset.
 
@@ -175,7 +176,6 @@ class Dummy(RawGeoFMDataset):
             folds = [5]
         self.modalities = ["S2"]
 
-        reference_date = "2017-06-01"
         self.reference_date = datetime(*map(int, reference_date.split("-")))
 
         self.num_classes = 11
@@ -272,16 +272,16 @@ class Dummy(RawGeoFMDataset):
             }
 
         # change the temporal axis
-        # data = {s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()}
+        indexes = {s: torch.linspace(
+                0, a.shape[1] - 1, self.multi_temporal, dtype=torch.long
+            ) for s, a in data.items()}
 
-        if self.multi_temporal == 1:
-            # we only take the last frame
-            optical_ts = optical_ts[:, -1]
+        data = {s: rearrange(a[indexes[s]], "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()}
         
         return_dict = {
-            "image":{s: rearrange(a, "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()},
+            "image": data,
             "target": target.to(torch.int64),
-            "metadata": metadata["dates"].to(torch.int32),
+            "metadata": metadata["dates"][indexes].to(torch.int32),
         }
 
         return return_dict
