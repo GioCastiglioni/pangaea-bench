@@ -276,12 +276,12 @@ class Dummy(RawGeoFMDataset):
                 0, a.shape[1] - 1, self.multi_temporal, dtype=torch.long
             ) for s, a in data.items()}
 
-        data = {s: rearrange(a[indexes[s]], "t c h w -> c t h w").to(torch.float32)  for s, a in data.items()}
+        data = {s: rearrange(a.to(torch.float32)[indexes[s]], "t c h w -> c t h w")  for s, a in data.items()}
         
         return_dict = {
             "image": data,
             "target": target.to(torch.int64),
-            "metadata": metadata["dates"][indexes].to(torch.int32),
+            "metadata": metadata["dates"][indexes["optical"]].to(torch.int32),
         }
 
         return return_dict
