@@ -173,7 +173,7 @@ class Encoder(nn.Module):
         """Download the model if the weights are not already downloaded."""
         if self.download_url and not os.path.isfile(self.encoder_weights):
             # TODO: change this path
-            os.makedirs("/home/gcastiglioni/storage/pretrained_models", exist_ok=True)
+            os.makedirs(cfg.workdir, exist_ok=True)
 
             pbar = DownloadProgressBar(f"Downloading {self.encoder_weights}")
 
