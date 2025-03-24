@@ -142,6 +142,9 @@ def main(cfg: DictConfig) -> None:
             checkpoint = torch.load("/home/gcastiglioni/storage/pangaea/20250310_141107_0c2606_ssl4eo_dino_seg_upernet_mt_ltae_croptypemapping/checkpoint__best.pth", weights_only=False)
             encoder.load_state_dict(checkpoint["encoder"])
             logger.info(f"Built {encoder.model_name} from pretraining.")
+        else:
+            encoder.load_encoder_weights(logger)
+            logger.info(f"Built {encoder.model_name} from checkpoint.")
     else:
         encoder.load_encoder_weights(logger)
         logger.info(f"Built {encoder.model_name} from checkpoint.")
