@@ -101,7 +101,7 @@ def main(cfg: DictConfig) -> None:
                 project=cfg.wandb_project,
                 name=exp_name,
                 config=wandb_cfg,
-                tags=[f"mt{cfg.dataset.multi_temporal}"],
+                tags=[f"mt{cfg.dataset.multi_temporal}", "ft" if cfg.finetune else "no-ft"],
             )
             cfg["wandb_run_id"] = wandb.run.id
         OmegaConf.save(cfg, config_log_dir / "config.yaml")
