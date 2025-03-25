@@ -1,5 +1,5 @@
 _target_: pangaea.encoders.croma_encoder.CROMA_OPTICAL_Encoder
-encoder_weights: /home/gcastiglioni/storage/pretrained_models/CROMA_large.pt
+encoder_weights: /home/gcastiglioni/workspace/pangaea/pretrained_models/CROMA_large.pt
 download_url: https://huggingface.co/antofuller/CROMA/resolve/main/CROMA_large.pt
 
 input_size: 120  # the paper uses 120
