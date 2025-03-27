@@ -174,7 +174,7 @@ class Encoder(nn.Module):
         if self.download_url and not os.path.isfile(self.encoder_weights):
             workdir = "/".join(self.encoder_weights.split("/")[:-1])
             # TODO: change this path
-            os.makedirs(f"/{workdir}", exist_ok=True)
+            os.makedirs(workdir, exist_ok=True)
 
             pbar = DownloadProgressBar(f"Downloading {self.encoder_weights}")
 

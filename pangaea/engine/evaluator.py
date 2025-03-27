@@ -89,7 +89,7 @@ class Evaluator:
         pass
 
     @staticmethod
-    def sliding_inference(model, img, input_size, output_shape=None, stride=None, max_batch=None):
+    def sliding_inference(model, img, input_size, output_shape=None, batch_positions=None, stride=None, max_batch=None):
         b, c, t, height, width = img[list(img.keys())[0]].shape
 
         if stride is None:
@@ -115,7 +115,7 @@ class Evaluator:
         batch_num = int(math.ceil(b * num_crops_per_img / max_batch))
         for i in range(batch_num):
             img_ = {k: v[max_batch * i: min(max_batch * i + max_batch, b * num_crops_per_img)] for k, v in img.items()}
-            pred_ = model.forward(img_, output_shape=(input_size, input_size))
+            pred_ = model.forward(img_, output_shape=(input_size, input_size), batch_positions=batch_positions)
             pred.append(pred_)
         pred = torch.cat(pred, dim=0)
         pred = pred.view(num_crops_per_img, b, -1, input_size, input_size).transpose(0, 1)
@@ -232,7 +232,7 @@ class SegEvaluator(Evaluator):
             if self.inference_mode == "sliding":
                 input_size = model.module.encoder.input_size
                 if model.module.encoder.model_name != "utae_encoder":
-                    logits = self.sliding_inference(model, image, input_size, output_shape=target.shape[-2:],
+                    logits = self.sliding_inference(model, image, input_size, output_shape=target.shape[-2:], batch_positions=data["metadata"],
                                                     max_batch=self.sliding_inference_batch)
                 else: 
                     logits = model(image, batch_positions=data["metadata"])
