@@ -18,7 +18,7 @@ from pangaea.datasets.base import GeoFMDataset, GeoFMSubset, RawGeoFMDataset
 from pangaea.decoders.base import Decoder
 from pangaea.encoders.base import Encoder
 from pangaea.engine.evaluator import Evaluator
-from pangaea.engine.trainer import Trainer
+from pangaea.engine.trainer import Trainer, PreTrainer
 from pangaea.utils.collate_fn import get_collate_fn
 from pangaea.utils.logger import init_logger
 from pangaea.utils.subset_sampler import get_subset_indices
