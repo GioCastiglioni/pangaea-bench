@@ -302,6 +302,7 @@ class SegEvaluator(Evaluator):
         torch.distributed.all_reduce(
             confusion_matrix, op=torch.distributed.ReduceOp.SUM
         )
+        print(confusion_matrix.cpu())
         metrics = self.compute_metrics(confusion_matrix.cpu())
         self.log_metrics(metrics)
 
