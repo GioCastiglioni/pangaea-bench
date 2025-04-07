@@ -13,6 +13,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+import torch.distributed as dist
 
 from pangaea.datasets.base import GeoFMDataset, GeoFMSubset, RawGeoFMDataset
 from pangaea.decoders.base import Decoder
@@ -35,33 +36,85 @@ for i in range(torch.cuda.device_count()):
     print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
 
 
-def get_exp_info(hydra_config: HydraConf) -> dict[str, str]:
-    """Create a unique experiment name based on the choices made in the config.
+# def get_exp_info(hydra_config: HydraConf) -> dict[str, str]:
+#     """Create a unique experiment name based on the choices made in the config.
 
-    Args:
-        hydra_config (HydraConf): hydra config.
+#     Args:
+#         hydra_config (HydraConf): hydra config.
 
-    Returns:
-        str: experiment information.
-    """
+#     Returns:
+#         str: experiment information.
+#     """
+#     choices = OmegaConf.to_container(hydra_config.runtime.choices)
+#     cfg_hash = hashlib.sha1(
+#         OmegaConf.to_yaml(hydra_config).encode(), usedforsecurity=False
+#     ).hexdigest()[:6]
+#     timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+#     fm = choices["encoder"]
+#     decoder = choices["decoder"]
+#     ds = choices["dataset"]
+#     task = choices["task"]
+#     exp_info = {
+#         "timestamp": timestamp,
+#         "fm": fm,
+#         "decoder": decoder,
+#         "ds": ds,
+#         "task": task,
+#         "exp_name": f"{timestamp}_{cfg_hash}_{fm}_{decoder}_{ds}",
+#     }
+#     return exp_info
+
+
+def get_shared_exp_info(hydra_config: HydraConf, is_distributed=False, rank=0) -> dict[str, str]:
     choices = OmegaConf.to_container(hydra_config.runtime.choices)
     cfg_hash = hashlib.sha1(
         OmegaConf.to_yaml(hydra_config).encode(), usedforsecurity=False
     ).hexdigest()[:6]
-    timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+    
+    if is_distributed:
+        if rank == 0:
+            timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+        else:
+            timestamp = None
+        # Broadcast timestamp from rank 0
+        timestamp = broadcast_string(timestamp, src=0)
+    else:
+        timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+
     fm = choices["encoder"]
     decoder = choices["decoder"]
     ds = choices["dataset"]
     task = choices["task"]
-    exp_info = {
+    exp_name = f"{timestamp}_{cfg_hash}_{fm}_{decoder}_{ds}"
+
+    return {
         "timestamp": timestamp,
         "fm": fm,
         "decoder": decoder,
         "ds": ds,
         "task": task,
-        "exp_name": f"{timestamp}_{cfg_hash}_{fm}_{decoder}_{ds}",
+        "exp_name": exp_name,
     }
-    return exp_info
+
+def broadcast_string(value: str, src: int = 0):
+    """Broadcast a string from src rank to all other ranks."""
+    # Convert string to bytes and to tensor
+    if value is not None:
+        encoded = value.encode('utf-8')
+        length = torch.tensor([len(encoded)], dtype=torch.long, device='cuda')
+        data = torch.tensor(list(encoded), dtype=torch.uint8, device='cuda')
+    else:
+        length = torch.tensor([0], dtype=torch.long, device='cuda')
+        data = torch.tensor([], dtype=torch.uint8, device='cuda')
+
+    # Broadcast length
+    torch.distributed.broadcast(length, src)
+    # Allocate tensor on other ranks
+    if value is None:
+        data = torch.empty(length.item(), dtype=torch.uint8, device='cuda')
+    # Broadcast actual data
+    torch.distributed.broadcast(data, src)
+    return bytes(data.tolist()).decode('utf-8')
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train")
@@ -74,6 +127,7 @@ def main(cfg: DictConfig) -> None:
     # fix all random seeds
     fix_seed(cfg.seed)
     # distributed training variables
+    is_distributed = dist.is_available() and dist.is_initialized()
     rank = int(os.environ["RANK"])
     local_rank = int(os.environ["LOCAL_RANK"])
     device = torch.device("cuda", local_rank)
@@ -84,7 +138,7 @@ def main(cfg: DictConfig) -> None:
     # true if training else false
     train_run = cfg.train
     if train_run:
-        exp_info = get_exp_info(HydraConfig.get())
+        exp_info = get_shared_exp_info(HydraConfig.get(), is_distributed, rank)
         exp_name = exp_info["exp_name"]
         task_name = exp_info["task"]
         exp_dir = pathlib.Path(cfg.work_dir) / exp_name
