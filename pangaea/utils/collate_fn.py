@@ -52,7 +52,7 @@ def get_collate_fn(modalities: list[str]) -> Callable:
             if "metadata" in batch[0]:
                 batch_out["metadata"] = torch.stack([x["metadata"] for x in batch])
             
-            return batch_out
+        return batch_out
 
     return collate_fn
 
