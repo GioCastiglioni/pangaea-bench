@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.dummy.Dummy
 dataset_name: Dummy
-root_path: /home/gcastiglioni/datasets/fix
+root_path: /home/gcast/datasets/fix
 download_url: None
 auto_download: False
 

@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.dummy.Dummy
 dataset_name: Dummy
-root_path: /home/gcastiglioni/datasets/crops/v1.1_19/processed
+root_path: /home/gcast/datasets/crops/v1.1_19/processed
 download_url: None
 auto_download: False
 

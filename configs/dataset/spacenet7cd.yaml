@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.spacenet7.SN7CD
 dataset_name: SN7CD
-root_path: /home/gcastiglioni/datasets/pangaea-bench/spacenet7
+root_path: /home/gcast/datasets/spacenet7
 download_url: https://drive.google.com/uc?id=1BADSEjxYKFZZlM-tEkRUfHvHi5XdaVV9
 auto_download: True
 

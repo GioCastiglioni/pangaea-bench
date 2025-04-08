@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.utae_dynamicen.DynamicEarthNet
 dataset_name: DynamicEarthNet
-root_path: /home/gcastiglioni/datasets/pangaea-bench/DynamicEarthNet
+root_path: /home/gcast/datasets/DynamicEarthNet
 download_url: None
 auto_download: False
 

@@ -1,6 +1,6 @@
 _target_: pangaea.datasets.hlsburnscars.HLSBurnScars
 dataset_name: HLSBurnScars
-root_path: /home/gcastiglioni/datasets/pangaea-bench/hlsburnscars
+root_path: /home/gcast/datasets/hlsburnscars
 download_url: https://huggingface.co/datasets/ibm-nasa-geospatial/hls_burn_scars/resolve/main/hls_burn_scars.tar.gz?download=true
 auto_download: True
 img_size: 512
