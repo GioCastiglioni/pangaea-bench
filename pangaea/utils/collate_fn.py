@@ -48,11 +48,13 @@ def get_collate_fn(modalities: list[str]) -> Callable:
         }
         
         # Conditionally add "metadata" if present in the first sample
-        if batch_out["image"][modalities[0]].shape[2] > 1:
-            if "metadata" in batch[0]:
+        if "metadata" in batch[0]:
+            if len(batch_out["image"][modalities[0]].shape) == 5 and batch[0]["metadata"] != {}:
                 batch_out["metadata"] = torch.stack([x["metadata"] for x in batch])
+            else:
+                batch_out["metadata"] = torch.stack([torch.tensor([0]) for _ in batch])
             
-            return batch_out
+        return batch_out
 
     return collate_fn
 

@@ -8,6 +8,8 @@ import pandas as pd
 import rasterio
 import torch
 
+from datetime import datetime
+
 from pangaea.datasets.base import RawGeoFMDataset
 from pangaea.datasets.utils import download_bucket_concurrently
 
@@ -139,20 +141,41 @@ class Sen1Floods11(RawGeoFMDataset):
     def __len__(self):
         return len(self.s1_image_list)
 
-    def _get_date(self, index):
+    # def _get_date(self, index):
+    #     file_name = self.s2_image_list[index]
+    #     location = os.path.basename(file_name).split("_")[0]
+    #     if self.metadata[self.metadata["location"] == location].shape[0] != 1:
+    #         date = pd.to_datetime("13-10-1998", dayfirst=True)
+    #     else:
+    #         date = pd.to_datetime(
+    #             self.metadata[self.metadata["location"] == location]["s2_date"].item()
+    #         )
+    #     date_np = np.zeros((1, 3))
+    #     date_np[0, 0] = date.year
+    #     date_np[0, 1] = date.dayofyear - 1  # base 0
+    #     date_np[0, 2] = date.hour
+    #     return date_np
+
+    def _get_date(self, index, reference_date_str="13-10-1998"):
+        # Use the provided reference date (using day-first format)
+        reference_date = pd.to_datetime(reference_date_str, dayfirst=True)
         file_name = self.s2_image_list[index]
         location = os.path.basename(file_name).split("_")[0]
+        
+        # If there is not exactly one metadata entry for the location, use the reference date
         if self.metadata[self.metadata["location"] == location].shape[0] != 1:
-            date = pd.to_datetime("13-10-1998", dayfirst=True)
+            date = reference_date
         else:
+            # Otherwise, get the date from metadata
             date = pd.to_datetime(
                 self.metadata[self.metadata["location"] == location]["s2_date"].item()
             )
-        date_np = np.zeros((1, 3))
-        date_np[0, 0] = date.year
-        date_np[0, 1] = date.dayofyear - 1  # base 0
-        date_np[0, 2] = date.hour
-        return date_np
+        
+        # Calculate the difference in days from the reference_date
+        delta_days = (date - reference_date).days
+        
+        # Return as a numpy array, as needed by your positional encoding pipeline
+        return torch.tensor([delta_days])
 
     def __getitem__(self, index):
         with rasterio.open(self.s2_image_list[index]) as src:
@@ -178,9 +201,10 @@ class Sen1Floods11(RawGeoFMDataset):
                 "sar": s1_image.unsqueeze(1),
             },
             "target": target,
-            "metadata": {
-                "timestamp": timestamp,
-            },
+            "metadata": timestamp
+            # "metadata": {
+            #     "timestamp": timestamp,
+            # },
         }
 
         return output
