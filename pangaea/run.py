@@ -13,7 +13,6 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-import torch.distributed as dist
 
 from pangaea.datasets.base import GeoFMDataset, GeoFMSubset, RawGeoFMDataset
 from pangaea.decoders.base import Decoder
@@ -127,14 +126,18 @@ def main(cfg: DictConfig) -> None:
     # fix all random seeds
     fix_seed(cfg.seed)
     # distributed training variables
-    is_distributed = dist.is_available() and dist.is_initialized()
-    rank = int(os.environ["RANK"])
     local_rank = int(os.environ["LOCAL_RANK"])
     device = torch.device("cuda", local_rank)
 
     torch.cuda.set_device(device)
     torch.distributed.init_process_group(backend="nccl")
 
+    if torch.distributed.is_available() and torch.distributed.is_initialized():
+        rank = torch.distributed.get_rank()
+        is_distributed = True
+    else:
+        rank = int(os.environ["RANK"])
+        is_distributed = False
     # true if training else false
     train_run = cfg.train
     if train_run:
@@ -143,6 +146,7 @@ def main(cfg: DictConfig) -> None:
         task_name = exp_info["task"]
         exp_dir = pathlib.Path(cfg.work_dir) / exp_name
         exp_dir.mkdir(parents=True, exist_ok=True)
+        torch.distributed.barrier()
         logger_path = exp_dir / "train.log"
         config_log_dir = exp_dir / "configs"
         config_log_dir.mkdir(exist_ok=True)
