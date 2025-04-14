@@ -666,6 +666,87 @@ class ImportanceRandomCropToEncoder(ImportanceRandomCrop):
         super().__init__(size, pad_if_needed, num_trials, **meta)
 
 
+class CenterCrop(BasePreprocessor):
+    def __init__(
+        self, size: int | Sequence[int], pad_if_needed: bool = False, **meta
+    ) -> None:
+        super().__init__()
+
+        self.size = tuple(
+            _setup_size(
+                size, error_msg="Please provide only two dimensions (h, w) for size."
+            )
+        )
+        self.pad_if_needed = pad_if_needed
+        self.pad_value = meta["data_mean"]
+        self.ignore_index = meta["ignore_index"]
+
+    def get_params(self, data: dict) -> Tuple[int, int, int, int]:
+        """Get parameters for center cropping."""
+        h, w = data["image"][list(data["image"].keys())[0]].shape[-2:]
+        th, tw = self.size
+        if h < th or w < tw:
+            raise ValueError(
+                f"Required crop size {(th, tw)} is larger than input image size {(h, w)}"
+            )
+
+        i = (h - th) // 2
+        j = (w - tw) // 2
+        return i, j, th, tw
+
+    def check_pad(
+        self,
+        data: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+    ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+        _, t, height, width = data["image"][list(data["image"].keys())[0]].shape
+
+        if height < self.size[0] or width < self.size[1]:
+            pad_img = max(self.size[0] - height, 0), max(self.size[1] - width, 0)
+            height, width = height + 2 * pad_img[0], width + 2 * pad_img[1]
+            for k, v in data["image"].items():
+                padded_img = (
+                    self.pad_value[k].reshape(-1, 1, 1, 1).repeat(1, t, height, width)
+                )
+                padded_img[:, :, pad_img[0] : -pad_img[0], pad_img[1] : -pad_img[1]] = v
+                data["image"][k] = padded_img
+
+            data["target"] = TF.pad(
+                data["target"],
+                padding=pad_img,
+                fill=self.ignore_index,
+                padding_mode="constant",
+            )
+
+        return data
+
+    def __call__(
+        self, data: dict[str, torch.Tensor | dict[str, torch.Tensor]]
+    ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+        self.check_size(data)
+
+        if self.pad_if_needed:
+            data = self.check_pad(data)
+
+        i, j, h, w = self.get_params(data=data)
+
+        for k, v in data["image"].items():
+            data["image"][k] = TF.crop(v, i, j, h, w)
+
+        data["target"] = TF.crop(data["target"], i, j, h, w)
+
+        return data
+
+    def update_meta(self, meta):
+        meta["data_img_size"] = self.size[0]
+        return meta
+
+
+class CenterCropToEncoder(CenterCrop):
+    def __init__(self, pad_if_needed: bool = False, **meta) -> None:
+        size = meta["encoder_input_size"]
+        super().__init__(size, pad_if_needed, **meta)
+
+
 class Resize(BasePreprocessor):
     def __init__(
         self,
