@@ -12,6 +12,8 @@ import pandas as pd
 
 import torch
 
+from datetime import datetime
+
 from pangaea.datasets.base import RawGeoFMDataset
 # from utils.registry import DATASET_REGISTRY
 
@@ -120,6 +122,8 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
         self.split_indices = np.where(split_mask)[0]
         self.ori_ids = torch.from_numpy(split_df['id'].values)
 
+        self.reference_date = datetime.strptime("2017-01-01", "%Y-%m-%d")
+
     
     def __getitem__(self, idx):
         id = self.split_indices[idx]
@@ -147,7 +151,11 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
             label = self._mapping_label(label)
             label = torch.from_numpy(label).long()
 
-            metadata = self.get_metadata(idx)
+            metadata = self.get_metadata(idx)["optical"] #self.get_metadata(idx)
+            metadata = [
+                (datetime.strptime(str(date.item()), "%Y%m%d") - self.reference_date).days
+                for date in metadata
+            ]
             
             output = {
                 'image': {
@@ -155,7 +163,7 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
                     'sar': s1
                 },
                 'target': label,
-                'metadata': metadata
+                'metadata': torch.tensor(metadata).long() #metadata
             }
 
             return output
