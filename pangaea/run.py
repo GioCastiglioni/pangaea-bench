@@ -258,15 +258,30 @@ def main(cfg: DictConfig) -> None:
         raw_train_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="train")
         raw_val_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="val")
 
+        is_main_process = not torch.distributed.is_available() or not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
+
         if 0 < cfg.limited_label_train < 1:
-            indices = get_subset_indices(
-                raw_train_dataset,
-                task=task_name,
-                strategy=cfg.limited_label_strategy,
-                label_fraction=cfg.limited_label_train,
-                num_bins=cfg.stratification_bins,
-                logger=logger,
-            )
+            indices_dir = pathlib.Path(cfg.work_dir) / str(cfg.dataset["dataset_name"])
+            indices_file = indices_dir / f"train_{int(cfg.limited_label_train*100)}.pt"
+            
+            if is_main_process:
+                if not indices_file.exists():
+                    indices_dir.mkdir(parents=True, exist_ok=True)
+                    indices = get_subset_indices(
+                        raw_train_dataset,
+                        task=task_name,
+                        strategy=cfg.limited_label_strategy,
+                        label_fraction=cfg.limited_label_train,
+                        num_bins=cfg.stratification_bins,
+                        logger=logger,
+                    )
+                    torch.save(indices, indices_file)
+
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.barrier()
+
+            indices = torch.load(indices_file, weights_only=False)
+
             raw_train_dataset = GeoFMSubset(raw_train_dataset, indices)
 
         if 0 < cfg.limited_label_val < 1:
