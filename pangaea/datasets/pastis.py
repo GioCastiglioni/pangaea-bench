@@ -14,7 +14,7 @@ import rasterio
 import torch
 from einops import rearrange
 
-from pangaea.datasets.base import RawGeoFMDataset
+from pangaea.datasets.base import RawGeoFMDataset, temporal_subsampling
 
 
 def prepare_dates(date_dict, reference_date):
@@ -347,12 +347,19 @@ class Pastis(RawGeoFMDataset):
             sar_ts = sar_ts[:, -1]
         else:
             # select evenly spaced samples
-            optical_indexes = torch.linspace(
-                0, optical_ts.shape[1] - 1, self.multi_temporal, dtype=torch.long
+            optical_whole_range_indexes = torch.linspace(
+                0, optical_ts.shape[1] - 1, 35, dtype=torch.long
             )
-            sar_indexes = torch.linspace(
-                0, sar_ts.shape[1] - 1, self.multi_temporal, dtype=torch.long
+            optical_indexes = temporal_subsampling(
+                self.multi_temporal, optical_whole_range_indexes, [6,15,25,35]
+                )
+
+            sar_whole_range_indexes = torch.linspace(
+                0, sar_ts.shape[1] - 1, 35, dtype=torch.long
             )
+            sar_indexes = temporal_subsampling(
+                self.multi_temporal, sar_whole_range_indexes, [6,15,25,35]
+                )
 
             optical_ts = optical_ts[:, optical_indexes]
             sar_ts = sar_ts[:, sar_indexes]
