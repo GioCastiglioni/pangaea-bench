@@ -343,8 +343,12 @@ class Pastis(RawGeoFMDataset):
 
         if self.multi_temporal == 1:
             # we only take the last frame
-            optical_ts = optical_ts[:, -1]
-            sar_ts = sar_ts[:, -1]
+            optical_indexes = torch.Tensor([-1]).long()
+            optical_ts = optical_ts[:, optical_indexes]
+            sar_indexes = torch.Tensor([-1]).long()
+            sar_ts = sar_ts[:, sar_indexes]
+
+            metadata = torch.Tensor([output["s2_dates"][optical_indexes].float()])
         else:
             # select evenly spaced samples
             optical_whole_range_indexes = torch.linspace(
@@ -364,13 +368,15 @@ class Pastis(RawGeoFMDataset):
             optical_ts = optical_ts[:, optical_indexes]
             sar_ts = sar_ts[:, sar_indexes]
 
+            metadata = output["s2_dates"][optical_indexes].float()
+
         return {
             "image": {
                 "optical": optical_ts.to(torch.float32),
                 "sar": sar_ts.to(torch.float32),
             },
             "target": output["label"].to(torch.int64),
-            "metadata": output["s2_dates"][optical_indexes].float(),
+            "metadata": metadata,
         }
 
     def __len__(self) -> int:
