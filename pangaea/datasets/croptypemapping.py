@@ -218,9 +218,11 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
     
     def pad_or_crop(self, tensor):
         '''
-        Right pads or crops tensor to GRID_SIZE.
+        Subsamples or crops tensor to GRID_SIZE.
         '''
-        if self.grid_size >= tensor.shape[-1]:
+        if self.grid_size == 1:
+            tensor = tensor[..., 0].unsqueeze(-1)
+        elif self.grid_size >= tensor.shape[-1]:
             pad_size = self.grid_size - tensor.shape[-1]
             tensor = torch.nn.functional.pad(input=tensor, pad=(0, pad_size), value=0)
         else:
