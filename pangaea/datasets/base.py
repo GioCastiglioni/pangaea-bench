@@ -194,7 +194,7 @@ class GeoFMDataset(Dataset):
         return output
 
 
-def temporal_subsampling(desired_length: int, curr: torch.Tensor, subsets: list):
+def temporal_subsampling(desired_length: int, curr: torch.Tensor, subsets: list = [1,6,15,25,35]):
     assert desired_length in subsets, "desired_length must be in the list of allowed subsets"
     subsets = subsets.copy()  # to avoid modifying the original list
     k = subsets.pop()  # extract last subset length

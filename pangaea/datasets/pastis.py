@@ -351,14 +351,14 @@ class Pastis(RawGeoFMDataset):
                 0, optical_ts.shape[1] - 1, 35, dtype=torch.long
             )
             optical_indexes = temporal_subsampling(
-                self.multi_temporal, optical_whole_range_indexes, [6,15,25,35]
+                self.multi_temporal, optical_whole_range_indexes
                 )
 
             sar_whole_range_indexes = torch.linspace(
                 0, sar_ts.shape[1] - 1, 35, dtype=torch.long
             )
             sar_indexes = temporal_subsampling(
-                self.multi_temporal, sar_whole_range_indexes, [6,15,25,35]
+                self.multi_temporal, sar_whole_range_indexes
                 )
 
             optical_ts = optical_ts[:, optical_indexes]
