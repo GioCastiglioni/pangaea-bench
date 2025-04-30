@@ -340,7 +340,7 @@ class SegMTUPerNet(SegUPerNet):
                 else:
                     self.ltae_adaptor = lambda x: x
                 self.tmap = LTAE2d(
-                    positional_encoding=False,
+                    positional_encoding=True,
                     in_channels=ltae_in_channels,
                     mlp=[ltae_in_channels, ltae_in_channels],
                     d_model=ltae_in_channels,
@@ -361,7 +361,7 @@ class SegMTUPerNet(SegUPerNet):
         return encoder.output_dim
 
     def forward(
-        self, img: dict[str, torch.Tensor], output_shape: torch.Size | None = None
+        self, img: dict[str, torch.Tensor], output_shape: torch.Size | None = None, batch_positions: torch.Tensor = None
     ) -> torch.Tensor:
         """Compute the segmentation output for multi-temporal data.
 
@@ -399,7 +399,7 @@ class SegMTUPerNet(SegUPerNet):
         if self.tmap is not None:
             if self.multi_temporal_strategy == "ltae":
                 feats = self.ltae_adaptor(feats)
-                feats = [self.tmap(f) for f in feats]
+                feats = [self.tmap(f, batch_positions=batch_positions) for f in feats]
             elif self.multi_temporal_strategy == "linear":
                 feats = [self.tmap(f.permute(0, 1, 3, 4, 2)).squeeze(-1) for f in feats]
 
