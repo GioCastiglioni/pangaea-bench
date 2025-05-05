@@ -1,6 +1,7 @@
 import random
 from tqdm import tqdm
 import numpy as np
+from scipy.special import rel_entr
 from pangaea.datasets.base import GeoFMDataset
 from pangaea.datasets.base import GeoFMSubset
 
@@ -113,10 +114,29 @@ def balance_seg_indices(
 
     if strategy == "stratified":
         # Select a proportion of indices from each bin   
-        selected_idx = []
-        for bin_id, indices in indices_per_bin.items():
-            num_to_select = int(max(1, len(indices) * label_fraction))  # Ensure at least one index is selected
-            selected_idx.extend(np.random.choice(indices, num_to_select, replace=False))
+        # selected_idx = []
+        # for bin_id, indices in indices_per_bin.items():
+        #     num_to_select = int(max(1, len(indices) * label_fraction))  # Ensure at least one index is selected
+        #     selected_idx.extend(np.random.choice(indices, num_to_select, replace=False))
+        
+        # Compute the "mean bin" vector and select samples whose bins are closest
+        mean_bin = np.round(binned_distributions.mean(axis=0)).astype(int)
+        # Compute distances to mean bin
+        distances = np.array([js_divergence(b, mean_bin) for b in binned_distributions])
+        total_to_select = int(len(dataset) * label_fraction)
+        sorted_idx = np.argsort(distances)
+        selected_idx = sorted_idx[:total_to_select].tolist()
+        # Ensure every class appears at least once
+        num_classes = binned_distributions.shape[1]
+        for c in range(num_classes):
+            if not any(binned_distributions[i, c] > 0 for i in selected_idx):
+                # find nearest unselected sample with class c present
+                candidates = [i for i, b in enumerate(binned_distributions)
+                              if b[c] > 0 and i not in selected_idx]
+                if candidates:
+                    nearest = min(candidates, key=lambda i: distances[i])
+                    selected_idx.append(int(nearest))
+
     elif strategy == "oversampled":
         # Prioritize the bins with the lowest values
         sorted_indices = np.argsort(combined_bins)
@@ -224,3 +244,13 @@ def get_subset_indices(dataset: GeoFMDataset,
     return indices
 
 
+
+# Define Jensen-Shannon divergence based on KL
+def js_divergence(p, q, eps=1e-12):
+    p = p.astype(np.float64) + eps
+    q = q.astype(np.float64) + eps
+    p = p / p.sum()
+    q = q / q.sum()
+    m = 0.5 * (p + q)
+    # symmetrized KL
+    return 0.5 * np.sum(rel_entr(p, m)) + 0.5 * np.sum(rel_entr(q, m))
