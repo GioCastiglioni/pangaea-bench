@@ -16,6 +16,7 @@ test_batch_size: 1
 # EXPERIMENT
 finetune: true
 from_scratch: true
+from_pretraining: false
 ft_rate: 1.0
 ckpt_dir: null
 limited_label_train: 1

@@ -149,7 +149,10 @@ class PreTrainer:
             image = {modality: value.to(self.device) for modality, value in image.items()}
 
             with torch.autocast("cuda", enabled=self.enable_mixed_precision, dtype=self.precision):
-                image = self.projector(self.model.module.forward_pretraining(image))
+                if self.model.module.encoder.model_name != "utae_encoder":
+                    image = self.projector(self.model.module.forward_pretraining(image))
+                else:
+                    image = self.projector(self.model.module.forward_pretraining(image, batch_positions=data["metadata"]))
                 loss, loss_var, loss_inv, loss_cov = self.compute_loss(image, image, each_comp=True)
                 total_loss += loss
                 total_inv += loss_inv
@@ -193,7 +196,7 @@ class PreTrainer:
                         step=epoch * len(self.train_loader)
                     )
                 torch.cuda.empty_cache()
-
+            torch.distributed.barrier()
             self.logger.info("============ Starting epoch %i ... ============" % epoch)
             # set sampler
             self.t = time.time()
@@ -237,8 +240,12 @@ class PreTrainer:
             with torch.autocast(
                 "cuda", enabled=self.enable_mixed_precision, dtype=self.precision
             ):
-                image1 = self.projector(self.model.module.forward_pretraining(image1))
-                image2 = self.projector(self.model.module.forward_pretraining(image2))
+                if self.model.module.encoder.model_name != "utae_encoder":
+                    image1 = self.projector(self.model.module.forward_pretraining(image1))
+                    image2 = self.projector(self.model.module.forward_pretraining(image2))
+                else:
+                    image1 = self.projector(self.model.module.forward_pretraining(image1, batch_positions=data["metadata"]))
+                    image2 = self.projector(self.model.module.forward_pretraining(image2, batch_positions=data["metadata"]))
 
                 loss, var, inv, cov = self.compute_loss(image1, image2, each_comp=True)
 

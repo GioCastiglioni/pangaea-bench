@@ -12,7 +12,9 @@ import pandas as pd
 
 import torch
 
-from pangaea.datasets.base import RawGeoFMDataset
+from datetime import datetime
+
+from pangaea.datasets.base import RawGeoFMDataset, temporal_subsampling
 # from utils.registry import DATASET_REGISTRY
 
 
@@ -120,6 +122,8 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
         self.split_indices = np.where(split_mask)[0]
         self.ori_ids = torch.from_numpy(split_df['id'].values)
 
+        self.reference_date = datetime.strptime("2017-01-01", "%Y-%m-%d")
+
     
     def __getitem__(self, idx):
         id = self.split_indices[idx]
@@ -138,27 +142,27 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
                 s1 = self.pad_or_crop(s1)
                 s2 = self.pad_or_crop(s2)
 
-
             s1 = torch.permute(s1, (0, 3, 1, 2))  # C, T, H, W
             s2 = torch.permute(s2, (0, 3, 1, 2))  # C, T, H, W
-
 
             label = np.load(os.path.join(self.root_path, self.country, 'truth', f'{self.country}_{loc_id}.npz'))['truth']
             label = self._mapping_label(label)
             label = torch.from_numpy(label).long()
 
-            metadata = self.get_metadata(idx)
-            
-            output = {
+            metadata = self.get_metadata(idx)["optical"] #self.get_metadata(idx)
+            metadata = [
+                (datetime.strptime(str(date.item()), "%Y%m%d") - self.reference_date).days
+                for date in metadata
+            ]
+
+            return {
                 'image': {
                     'optical': s2,
                     'sar': s1
                 },
                 'target': label,
-                'metadata': metadata
+                'metadata': torch.tensor(metadata).long() #metadata
             }
-
-            return output
         
         except zipfile.BadZipFile:
             print(f"BadZipFile: {file_path}. This file is skipped.")
@@ -214,13 +218,17 @@ class CropTypeMappingSouthSudan(RawGeoFMDataset):
     
     def pad_or_crop(self, tensor):
         '''
-        Right pads or crops tensor to GRID_SIZE.
+        Subsamples or crops tensor to GRID_SIZE.
         '''
-        # if self.grid_size >= tensor.shape[-1]:
-        pad_size = self.grid_size - tensor.shape[-1]
-        tensor = torch.nn.functional.pad(input=tensor, pad=(0, pad_size), value=0)
-        # else:
-        #     tensor = tensor[..., :self.grid_size]
+        if self.grid_size == 1:
+            tensor = tensor[..., 0].unsqueeze(-1)
+        elif self.grid_size >= tensor.shape[-1]:
+            pad_size = self.grid_size - tensor.shape[-1]
+            tensor = torch.nn.functional.pad(input=tensor, pad=(0, pad_size), value=0)
+        else:
+            whole_range_indexes = torch.linspace(0, tensor.shape[-1] - 1, 35, dtype=torch.long)
+            indexes = temporal_subsampling(self.grid_size, whole_range_indexes)
+            tensor = tensor[..., indexes]
         return tensor
 
     @staticmethod

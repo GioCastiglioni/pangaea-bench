@@ -47,6 +47,7 @@ class UTAE(Decoder):
         self.model_name = 'UTAE_SemanticSegmentation'
         self.align_corners = False
         self.topology = encoder.topology
+        self.in_channels = deepcopy(self.topology)
         self.dec_topology = dec_topology
 
         self.encoder = encoder
@@ -66,7 +67,7 @@ class UTAE(Decoder):
             )
             for i in range(len(self.topology) - 1, 0, -1)
         )
-        self.temporal_encoder = LTAE2d(
+        self.tmap = LTAE2d(
             in_channels=self.topology[-1],
             d_model=256,
             n_head=16,
@@ -90,7 +91,7 @@ class UTAE(Decoder):
             out = self.encoder.down_blocks[i].smart_forward(feature_maps[-1])
             feature_maps.append(out)
         # TEMPORAL ENCODER
-        out, att = self.temporal_encoder(
+        out, att = self.tmap(
             feature_maps[-1].permute(0,2,1,3,4), batch_positions=batch_positions, pad_mask=pad_mask
         )
         # SPATIAL DECODER
@@ -106,6 +107,27 @@ class UTAE(Decoder):
                 return out, att
             else:
                 return out
+
+    def forward_pretraining(self, img: dict[str, torch.Tensor], batch_positions=None) -> torch.Tensor:
+        if type(img) is dict: pass
+        else: img = {'optical': img}
+
+        input = img["optical"].permute(0,2,1,3,4)
+
+        pad_mask = (
+            (input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1)
+        )  # BxT pad mask
+        out = self.encoder.in_conv.smart_forward(input)
+        feature_maps = [out]
+        # SPATIAL ENCODER
+        for i in range(len(self.topology) - 1):
+            out = self.encoder.down_blocks[i].smart_forward(feature_maps[-1])
+            feature_maps.append(out)
+        # TEMPORAL ENCODER
+        out, _ = self.tmap(
+            feature_maps[-1].permute(0,2,1,3,4), batch_positions=batch_positions.to(out.device), pad_mask=pad_mask
+        )
+        return out
 
 
 class TemporallySharedBlock(nn.Module):
